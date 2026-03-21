@@ -26,6 +26,24 @@ jobs:
           flutter-version: '3.22.0'
           channel: stable
 
+      - name: Regenerate Android project
+        working-directory: feriwala_customer
+        run: |
+          rm -rf android
+          flutter create --platforms android .
+          # Fix applicationId (flutter create uses com.example by default)
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's|applicationId = "com.example.feriwala_customer"|applicationId = "com.feriwala.customer"|' android/app/build.gradle.kts
+            sed -i 's|namespace = "com.example.feriwala_customer"|namespace = "com.feriwala.customer"|' android/app/build.gradle.kts
+          elif grep -q 'applicationId' android/app/build.gradle; then
+            sed -i 's|applicationId "com.example.feriwala_customer"|applicationId "com.feriwala.customer"|' android/app/build.gradle
+            sed -i 's|namespace "com.example.feriwala_customer"|namespace "com.feriwala.customer"|' android/app/build.gradle
+          fi
+          # Add location permissions
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET"/>|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>|' android/app/src/main/AndroidManifest.xml
+          # Add Google Maps API key
+          sed -i 's|</application>|    <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyDKijqkofbXiD1WOkPmW-6CQFEpRuLHCJ4"/>\n    </application>|' android/app/src/main/AndroidManifest.xml
+
       - name: Get dependencies
         working-directory: feriwala_customer
         run: flutter pub get
@@ -59,6 +77,22 @@ jobs:
           flutter-version: '3.22.0'
           channel: stable
 
+      - name: Regenerate Android project
+        working-directory: feriwala_shop
+        run: |
+          rm -rf android
+          flutter create --platforms android .
+          # Fix applicationId
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's|applicationId = "com.example.feriwala_shop"|applicationId = "com.feriwala.shop"|' android/app/build.gradle.kts
+            sed -i 's|namespace = "com.example.feriwala_shop"|namespace = "com.feriwala.shop"|' android/app/build.gradle.kts
+          elif grep -q 'applicationId' android/app/build.gradle; then
+            sed -i 's|applicationId "com.example.feriwala_shop"|applicationId "com.feriwala.shop"|' android/app/build.gradle
+            sed -i 's|namespace "com.example.feriwala_shop"|namespace "com.feriwala.shop"|' android/app/build.gradle
+          fi
+          # Add location permissions
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET"/>|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>|' android/app/src/main/AndroidManifest.xml
+
       - name: Get dependencies
         working-directory: feriwala_shop
         run: flutter pub get
@@ -91,6 +125,22 @@ jobs:
         with:
           flutter-version: '3.22.0'
           channel: stable
+
+      - name: Regenerate Android project
+        working-directory: feriwala_delivery
+        run: |
+          rm -rf android
+          flutter create --platforms android .
+          # Fix applicationId
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's|applicationId = "com.example.feriwala_delivery"|applicationId = "com.feriwala.delivery"|' android/app/build.gradle.kts
+            sed -i 's|namespace = "com.example.feriwala_delivery"|namespace = "com.feriwala.delivery"|' android/app/build.gradle.kts
+          elif grep -q 'applicationId' android/app/build.gradle; then
+            sed -i 's|applicationId "com.example.feriwala_delivery"|applicationId "com.feriwala.delivery"|' android/app/build.gradle
+            sed -i 's|namespace "com.example.feriwala_delivery"|namespace "com.feriwala.delivery"|' android/app/build.gradle
+          fi
+          # Add location permissions
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET"/>|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>|' android/app/src/main/AndroidManifest.xml
 
       - name: Get dependencies
         working-directory: feriwala_delivery
