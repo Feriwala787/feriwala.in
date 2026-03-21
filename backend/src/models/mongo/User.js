@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
+  loginId: { type: String, required: true, unique: true, lowercase: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone: { type: String, required: true, unique: true, trim: true },
   passwordHash: { type: String, required: true },
@@ -35,6 +36,7 @@ const userSchema = new mongoose.Schema({
 
 userSchema.index({ email: 1 });
 userSchema.index({ phone: 1 });
+userSchema.index({ loginId: 1 });
 userSchema.index({ role: 1 });
 
 userSchema.pre('save', async function (next) {

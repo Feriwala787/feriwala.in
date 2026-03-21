@@ -24,7 +24,7 @@ echo "=== Writing .env ==="
 cat > /home/bitnami/feriwala/backend/.env <<'ENVEOF'
 NODE_ENV=production
 PORT=3000
-MONGODB_URI=mongodb+srv://Feriwla:Ssb9119%40%24%25@cluster0.v2dvryi.mongodb.net/feriwala_users?retryWrites=true&w=majority&appName=Cluster0
+MONGODB_URI=mongodb+srv://Feriwala:DTAv%4068RHLhinWm@cluster0.v2dvryi.mongodb.net/feriwala_users?retryWrites=true&w=majority&appName=Cluster0
 PG_HOST=localhost
 PG_PORT=5432
 PG_DATABASE=feriwala_db

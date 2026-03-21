@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
 const User = require('../models/mongo/User');
 const DeliveryAgentProfile = require('../models/mongo/DeliveryAgentProfile');
-const { generateTokens } = require('../utils/helpers');
+const { generateTokens, generateLoginId } = require('../utils/helpers');
 const { authenticate } = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 
@@ -27,8 +27,17 @@ router.post('/register', [
       return res.status(409).json({ success: false, message: 'Email or phone already registered' });
     }
 
+    // Generate unique loginId
+    let loginId = generateLoginId(name);
+    let loginIdExists = await User.findOne({ loginId });
+    while (loginIdExists) {
+      loginId = generateLoginId(name); // Regenerate if collision occurs
+      loginIdExists = await User.findOne({ loginId });
+    }
+
     const user = new User({
       name,
+      loginId,
       email,
       phone,
       passwordHash: password,
@@ -56,8 +65,8 @@ router.post('/register', [
 
 // Login
 router.post('/login', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty(),
+  body('credential').notEmpty().withMessage('Email, phone, or login ID required'),
+  body('password').notEmpty().withMessage('Password required'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -65,8 +74,16 @@ router.post('/login', [
       return res.status(400).json({ success: false, errors: errors.array() });
     }
 
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const { credential, password } = req.body;
+    
+    // Find user by email, phone, or loginId
+    const user = await User.findOne({ 
+      $or: [
+        { email: credential.toLowerCase() },
+        { phone: credential },
+        { loginId: credential.toLowerCase() }
+      ]
+    });
 
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });

@@ -47,10 +47,24 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+function generateLoginId(name) {
+  // Create base from name: convert to lowercase, remove spaces, remove special chars
+  const baseId = name
+    .toLowerCase()
+    .replace(/\s+/g, '') // remove spaces
+    .replace(/[^a-z0-9]/g, '') // keep only alphanumeric
+    .substring(0, 12); // limit to 12 chars
+  
+  // Add random suffix for uniqueness
+  const randomSuffix = Math.random().toString(36).substring(2, 6);
+  return `${baseId}${randomSuffix}`;
+}
+
 module.exports = {
   generateTokens,
   generateOrderNumber,
   generateInvoiceNumber,
   generateOtp,
   calculateDistance,
+  generateLoginId,
 };
