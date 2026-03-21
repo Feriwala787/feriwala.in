@@ -43,6 +43,9 @@ jobs:
           sed -i 's|<uses-permission android:name="android.permission.INTERNET"/>|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>|' android/app/src/main/AndroidManifest.xml
           # Add Google Maps API key
           sed -i 's|</application>|    <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyDKijqkofbXiD1WOkPmW-6CQFEpRuLHCJ4"/>\n    </application>|' android/app/src/main/AndroidManifest.xml
+          # Upgrade Kotlin version to be compatible with Flutter plugins (require >= 1.9.0)
+          find android -name 'settings.gradle' -exec sed -i 's/kotlin.android" version "[^"]*"/kotlin.android" version "1.9.25"/g' {} \;
+          find android -name 'settings.gradle.kts' -exec sed -i 's/kotlin.android") version "[^"]*"/kotlin.android") version "1.9.25"/g' {} \;
 
       - name: Get dependencies
         working-directory: feriwala_customer
@@ -92,6 +95,9 @@ jobs:
           fi
           # Add location permissions
           sed -i 's|<uses-permission android:name="android.permission.INTERNET"/>|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>|' android/app/src/main/AndroidManifest.xml
+          # Upgrade Kotlin version
+          find android -name 'settings.gradle' -exec sed -i 's/kotlin.android" version "[^"]*"/kotlin.android" version "1.9.25"/g' {} \;
+          find android -name 'settings.gradle.kts' -exec sed -i 's/kotlin.android") version "[^"]*"/kotlin.android") version "1.9.25"/g' {} \;
 
       - name: Get dependencies
         working-directory: feriwala_shop
@@ -139,8 +145,11 @@ jobs:
             sed -i 's|applicationId "com.example.feriwala_delivery"|applicationId "com.feriwala.delivery"|' android/app/build.gradle
             sed -i 's|namespace "com.example.feriwala_delivery"|namespace "com.feriwala.delivery"|' android/app/build.gradle
           fi
-          # Add location permissions
+          # Add location permissions (delivery)
           sed -i 's|<uses-permission android:name="android.permission.INTERNET"/>|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>|' android/app/src/main/AndroidManifest.xml
+          # Upgrade Kotlin version
+          find android -name 'settings.gradle' -exec sed -i 's/kotlin.android" version "[^"]*"/kotlin.android" version "1.9.25"/g' {} \;
+          find android -name 'settings.gradle.kts' -exec sed -i 's/kotlin.android") version "[^"]*"/kotlin.android") version "1.9.25"/g' {} \;
 
       - name: Get dependencies
         working-directory: feriwala_delivery
