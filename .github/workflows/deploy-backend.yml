@@ -16,8 +16,9 @@ jobs:
 
       - name: Write SSH Key
         run: |
-          echo "${{ secrets.LIGHTSAIL_SSH_KEY }}" > lightsail.pem
+          printf '%s' "${{ secrets.LIGHTSAIL_SSH_KEY }}" | tr -d '\r' > lightsail.pem
           chmod 600 lightsail.pem
+          ssh-keygen -y -f lightsail.pem > /dev/null
 
       - name: Sync backend code to server
         run: |
