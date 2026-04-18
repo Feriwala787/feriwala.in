@@ -4,10 +4,21 @@ const User = require('../models/mongo/User');
 const DeliveryAgentProfile = require('../models/mongo/DeliveryAgentProfile');
 const { generateTokens, generateLoginId } = require('../utils/helpers');
 const { authenticate } = require('../middleware/auth');
+const { isMongoReady } = require('../database/mongodb');
 const jwt = require('jsonwebtoken');
 
+function requireMongoReady(req, res, next) {
+  if (!isMongoReady()) {
+    return res.status(503).json({
+      success: false,
+      message: 'Authentication service temporarily unavailable. Please retry shortly.',
+    });
+  }
+  return next();
+}
+
 // Register
-router.post('/register', [
+router.post('/register', requireMongoReady, [
   body('name').trim().notEmpty().withMessage('Name is required'),
   body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
   body('phone').trim().notEmpty().withMessage('Phone is required'),
@@ -64,7 +75,7 @@ router.post('/register', [
 });
 
 // Login
-router.post('/login', [
+router.post('/login', requireMongoReady, [
   body('credential').notEmpty().withMessage('Email, phone, or login ID required'),
   body('password').notEmpty().withMessage('Password required'),
 ], async (req, res) => {
@@ -105,7 +116,7 @@ router.post('/login', [
 });
 
 // Refresh Token
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', requireMongoReady, async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {

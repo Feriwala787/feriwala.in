@@ -8,7 +8,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 
-const { connectMongoDB } = require('./database/mongodb');
+const { connectMongoDB, isMongoReady } = require('./database/mongodb');
 const { connectPostgres, syncModels } = require('./database/postgres');
 const socketHandler = require('./sockets/socketHandler');
 
@@ -63,6 +63,37 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.get('/api/health/deep', async (req, res) => {
+  const mongoConnected = isMongoReady();
+  let postgresConnected = false;
+
+  try {
+    await connectPostgres();
+    postgresConnected = true;
+  } catch (err) {
+    dbStatus.postgres.connected = false;
+    dbStatus.postgres.lastError = err.message;
+  }
+
+  if (mongoConnected) {
+    dbStatus.mongo.connected = true;
+  }
+  if (postgresConnected) {
+    dbStatus.postgres.connected = true;
+    dbStatus.postgres.lastSuccessAt = new Date().toISOString();
+  }
+
+  const healthy = mongoConnected && postgresConnected;
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    services: {
+      mongo: { ...dbStatus.mongo, ready: mongoConnected },
+      postgres: { ...dbStatus.postgres, ready: postgresConnected },
+    },
+  });
+});
+
 // Socket.IO
 socketHandler(io);
 
@@ -81,16 +112,26 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+const dbStatus = {
+  mongo: { connected: false, lastError: null, lastSuccessAt: null, attempts: 0 },
+  postgres: { connected: false, lastError: null, lastSuccessAt: null, attempts: 0 },
+};
 
 async function connectDatabases() {
   // Connect MongoDB with retry
   const mongoRetry = async (attempts = 5) => {
     for (let i = 1; i <= attempts; i++) {
+      dbStatus.mongo.attempts += 1;
       try {
         await connectMongoDB();
+        dbStatus.mongo.connected = true;
+        dbStatus.mongo.lastError = null;
+        dbStatus.mongo.lastSuccessAt = new Date().toISOString();
         console.log('MongoDB connected');
         return;
       } catch (err) {
+        dbStatus.mongo.connected = false;
+        dbStatus.mongo.lastError = err.message;
         console.error(`MongoDB connection attempt ${i}/${attempts} failed:`, err.message);
         if (i < attempts) await new Promise(r => setTimeout(r, 10000));
       }
@@ -101,12 +142,18 @@ async function connectDatabases() {
   // Connect PostgreSQL with retry
   const pgRetry = async (attempts = 5) => {
     for (let i = 1; i <= attempts; i++) {
+      dbStatus.postgres.attempts += 1;
       try {
         await connectPostgres();
         await syncModels();
+        dbStatus.postgres.connected = true;
+        dbStatus.postgres.lastError = null;
+        dbStatus.postgres.lastSuccessAt = new Date().toISOString();
         console.log('PostgreSQL connected and models synced');
         return;
       } catch (err) {
+        dbStatus.postgres.connected = false;
+        dbStatus.postgres.lastError = err.message;
         console.error(`PostgreSQL connection attempt ${i}/${attempts} failed:`, err.message);
         if (i < attempts) await new Promise(r => setTimeout(r, 10000));
       }
