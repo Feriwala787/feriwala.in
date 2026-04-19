@@ -13,7 +13,7 @@ const navByRole = {
   shop_admin: [
     { path: '/', label: 'Overview', icon: '📊' },
     { path: '/products', label: 'My Products', icon: '🛍️' },
-    { path: '/orders', label: 'Orders', icon: '📦' },
+    { path: '/operations', label: 'App Operations', icon: '📱' },
     { path: '/categories', label: 'Categories', icon: '📂' },
   ],
 };
@@ -70,4 +70,3 @@ export default function Layout() {
     </div>
   );
 }
-

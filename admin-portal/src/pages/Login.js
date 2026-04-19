@@ -29,7 +29,7 @@ export default function Login() {
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-feriwala-dark">🛒 Feriwala</h1>
-          <p className="text-gray-500 mt-2">Admin and Shop Owner Portal</p>
+          <p className="text-gray-500 mt-2">Admin & Shop Owner Web Portal (same credentials as shop app)</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -67,4 +67,3 @@ export default function Login() {
     </div>
   );
 }
-

@@ -234,6 +234,11 @@ class _ProductCard extends StatelessWidget {
                 children: [
                   Text(product['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                  if (product['attributes'] is Map && product['attributes']['productType'] != null)
+                    Text(product['attributes']['productType'],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: Colors.grey)),
                   const SizedBox(height: 4),
                   Row(children: [
                     Text('₹${product['sellingPrice']}',
@@ -292,6 +297,11 @@ class _ProductGridItem extends StatelessWidget {
                     Text(product['brand'], style: const TextStyle(fontSize: 10, color: Colors.grey)),
                   Text(product['name'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                  if (product['attributes'] is Map && product['attributes']['productType'] != null)
+                    Text(product['attributes']['productType'],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: Colors.grey)),
                   const SizedBox(height: 4),
                   Row(children: [
                     Text('₹${product['sellingPrice']}',

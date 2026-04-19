@@ -6,13 +6,14 @@ const Product = require('../models/pg/Product');
 const Category = require('../models/pg/Category');
 const Inventory = require('../models/pg/Inventory');
 const Shop = require('../models/pg/Shop');
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 
 // Get all products (public - customer browsing)
 router.get('/', async (req, res) => {
   try {
     const {
-      shopId, categoryId, search, gender, brand,
+      shopId, categoryId, search, gender, brand, size, color, material,
+      productType, fit, pattern, sleeveType, neckType, occasion,
       minPrice, maxPrice, featured, page = 1, limit = 20,
       sortBy = 'createdAt', sortOrder = 'DESC',
     } = req.query;
@@ -22,6 +23,9 @@ router.get('/', async (req, res) => {
     if (categoryId) where.categoryId = parseInt(categoryId);
     if (gender) where.gender = gender;
     if (brand) where.brand = { [Op.iLike]: `%${brand}%` };
+    if (size) where.size = { [Op.iLike]: `%${size}%` };
+    if (color) where.color = { [Op.iLike]: `%${color}%` };
+    if (material) where.material = { [Op.iLike]: `%${material}%` };
     if (featured === 'true') where.isFeatured = true;
     if (minPrice) where.sellingPrice = { ...where.sellingPrice, [Op.gte]: parseFloat(minPrice) };
     if (maxPrice) where.sellingPrice = { ...where.sellingPrice, [Op.lte]: parseFloat(maxPrice) };
@@ -31,6 +35,28 @@ router.get('/', async (req, res) => {
         { brand: { [Op.iLike]: `%${search}%` } },
         { description: { [Op.iLike]: `%${search}%` } },
       ];
+    }
+
+    const attributeConditions = [];
+    const jsonFilter = (field, value) => {
+      if (!value) return;
+      attributeConditions.push(
+        Sequelize.where(
+          Sequelize.cast(Sequelize.json(`attributes.${field}`), 'text'),
+          { [Op.iLike]: `%${value}%` },
+        ),
+      );
+    };
+
+    jsonFilter('productType', productType);
+    jsonFilter('fit', fit);
+    jsonFilter('pattern', pattern);
+    jsonFilter('sleeveType', sleeveType);
+    jsonFilter('neckType', neckType);
+    jsonFilter('occasion', occasion);
+
+    if (attributeConditions.length > 0) {
+      where[Op.and] = [...(where[Op.and] || []), ...attributeConditions];
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);

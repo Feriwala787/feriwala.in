@@ -16,6 +16,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _loading = true;
   int _quantity = 1;
 
+  Map<String, dynamic> get _attributes {
+    final raw = _product?['attributes'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((key, value) => MapEntry(key.toString(), value));
+    return const {};
+  }
+
   @override
   void initState() {
     super.initState();
@@ -126,6 +133,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             if (_product!['color'] != null) _DetailRow(label: 'Color', value: _product!['color']),
                             if (_product!['material'] != null) _DetailRow(label: 'Material', value: _product!['material']),
                             if (_product!['gender'] != null) _DetailRow(label: 'For', value: _product!['gender']),
+                            if (_attributes['productType'] != null) _DetailRow(label: 'Type', value: _attributes['productType']),
+                            if (_attributes['fit'] != null) _DetailRow(label: 'Fit', value: _attributes['fit']),
+                            if (_attributes['pattern'] != null) _DetailRow(label: 'Pattern', value: _attributes['pattern']),
+                            if (_attributes['sleeveType'] != null) _DetailRow(label: 'Sleeve', value: _attributes['sleeveType']),
+                            if (_attributes['neckType'] != null) _DetailRow(label: 'Neck', value: _attributes['neckType']),
+                            if (_attributes['occasion'] != null) _DetailRow(label: 'Occasion', value: _attributes['occasion']),
 
                             // Stock
                             if (_product!['inventory'] != null && (_product!['inventory'] as List).isNotEmpty)
@@ -141,6 +154,42 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
 
                             const SizedBox(height: 16),
+                            if (_attributes['careInstructions'] != null || _attributes['sizeChartUrl'] != null) ...[
+                              const Text('Care & Sizing', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              if (_attributes['careInstructions'] != null)
+                                _DetailRow(label: 'Care', value: _attributes['careInstructions']),
+                              if (_attributes['sizeChartUrl'] != null)
+                                _DetailRow(label: 'Size Chart', value: _attributes['sizeChartUrl']),
+                              const SizedBox(height: 12),
+                            ],
+
+                            if (_attributes['countryOfOrigin'] != null ||
+                                _attributes['manufacturerDetails'] != null ||
+                                _attributes['returnPolicy'] != null ||
+                                _attributes['deliveryTimeline'] != null ||
+                                _attributes['shippingWeight'] != null ||
+                                _attributes['packageDimensions'] != null ||
+                                _attributes['gstRate'] != null) ...[
+                              const Text('Shipping & Policy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              if (_attributes['countryOfOrigin'] != null)
+                                _DetailRow(label: 'Origin', value: _attributes['countryOfOrigin']),
+                              if (_attributes['manufacturerDetails'] != null)
+                                _DetailRow(label: 'Manufacturer', value: _attributes['manufacturerDetails']),
+                              if (_attributes['returnPolicy'] != null)
+                                _DetailRow(label: 'Return', value: _attributes['returnPolicy']),
+                              if (_attributes['deliveryTimeline'] != null)
+                                _DetailRow(label: 'Delivery', value: _attributes['deliveryTimeline']),
+                              if (_attributes['shippingWeight'] != null)
+                                _DetailRow(label: 'Weight', value: _attributes['shippingWeight']),
+                              if (_attributes['packageDimensions'] != null)
+                                _DetailRow(label: 'Dimensions', value: _attributes['packageDimensions']),
+                              if (_attributes['gstRate'] != null)
+                                _DetailRow(label: 'GST', value: '${_attributes['gstRate']}%'),
+                              const SizedBox(height: 12),
+                            ],
+
                             if (_product!['description'] != null) ...[
                               const Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),

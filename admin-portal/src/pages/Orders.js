@@ -55,6 +55,18 @@ export default function Orders() {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
+  if (user?.role === 'shop_admin') {
+    return (
+      <div className="bg-amber-50 border border-amber-100 rounded-xl p-6">
+        <h2 className="text-2xl font-bold text-amber-900">Orders move to mobile app</h2>
+        <p className="text-sm text-amber-800 mt-2">
+          To keep shop operations fast, order receiving and live status updates are handled in the shop mobile app with notifications.
+          Use the web portal for product listing and catalog management.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">{user?.role === 'shop_admin' ? 'My Shop Orders' : 'Recent Orders'}</h2>
@@ -101,4 +113,3 @@ export default function Orders() {
     </div>
   );
 }
-
