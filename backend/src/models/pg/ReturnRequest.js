@@ -7,6 +7,7 @@ const ReturnRequest = sequelize.define('ReturnRequest', {
   orderItemId: { type: DataTypes.INTEGER, allowNull: false },
   shopId: { type: DataTypes.INTEGER, allowNull: false },
   customerId: { type: DataTypes.STRING(30), allowNull: false },
+  returnType: { type: DataTypes.ENUM('return', 'replace'), defaultValue: 'return' },
   reason: { type: DataTypes.TEXT, allowNull: false },
   status: {
     type: DataTypes.ENUM('requested', 'approved', 'pickup_assigned', 'picked_up', 'inspecting', 'completed', 'rejected'),
@@ -28,6 +29,11 @@ const ReturnRequest = sequelize.define('ReturnRequest', {
   verificationImages: { type: DataTypes.JSONB, defaultValue: [] },
   refundAmount: { type: DataTypes.DECIMAL(10, 2) },
   refundStatus: { type: DataTypes.ENUM('pending', 'processed', 'failed'), defaultValue: 'pending' },
+  bankDetails: { type: DataTypes.JSONB, defaultValue: {} },
+  replacementPreference: { type: DataTypes.JSONB, defaultValue: {} },
+  refundReference: { type: DataTypes.STRING(120) },
+  pickupBatchDate: { type: DataTypes.DATE },
+  replacementOrderId: { type: DataTypes.INTEGER },
   approvedAt: { type: DataTypes.DATE },
   completedAt: { type: DataTypes.DATE },
 }, {

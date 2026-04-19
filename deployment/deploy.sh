@@ -4,7 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="${SCRIPT_DIR}/.env"
+DEPLOY_ENV_FILE="${SCRIPT_DIR}/.env"
+APP_ENV_FILE="${APP_ENV_FILE:-${SCRIPT_DIR}/backend.env}"
 
 source_nonempty_env_file() {
   local file="$1"
@@ -25,7 +26,7 @@ source_nonempty_env_file() {
   return 0
 }
 
-source_nonempty_env_file "$ENV_FILE"
+source_nonempty_env_file "$DEPLOY_ENV_FILE"
 
 SERVER_HOST="${SERVER_HOST:-65.2.9.216}"
 SSH_USER="${SSH_USER:-bitnami}"
@@ -110,8 +111,14 @@ echo ">> Syncing deployment configs..."
 eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$SCRIPT_DIR/ecosystem.config.js" "$SCRIPT_DIR/remote-setup.sh" "$SCRIPT_DIR/setup-server.sh" "$SERVER:$REMOTE_DIR/deployment/"
 eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$SCRIPT_DIR/nginx.conf" "$SERVER:/tmp/feriwala-nginx.conf"
 
-if [ -f "$ENV_FILE" ]; then
-  eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$ENV_FILE" "$SERVER:$REMOTE_DIR/deployment/.env"
+if [ -f "$APP_ENV_FILE" ]; then
+  eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$APP_ENV_FILE" "$SERVER:$REMOTE_DIR/deployment/.env"
+elif [ -f "$DEPLOY_ENV_FILE" ] && grep -q "^MONGODB_URI=" "$DEPLOY_ENV_FILE"; then
+  echo ">> APP_ENV_FILE not found; using legacy deployment/.env as backend env."
+  eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$DEPLOY_ENV_FILE" "$SERVER:$REMOTE_DIR/deployment/.env"
+else
+  echo "Missing app env file. Create deployment/backend.env (from deployment/backend.env.example) or set APP_ENV_FILE."
+  exit 1
 fi
 
 # 4. Remote setup and restart

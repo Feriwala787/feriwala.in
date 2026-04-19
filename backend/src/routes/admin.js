@@ -7,6 +7,7 @@ const User = require('../models/mongo/User');
 const Order = require('../models/pg/Order');
 const Product = require('../models/pg/Product');
 const { Op } = require('sequelize');
+const { APPAREL_CATEGORY_PRESET } = require('../constants/apparelCategories');
 
 // Middleware: admin only
 router.use(authenticate, authorize('admin'));
@@ -101,6 +102,70 @@ router.put('/categories/:id', async (req, res) => {
 
     await category.update(req.body);
     res.json({ success: true, data: category });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Seed apparel-focused category taxonomy (idempotent)
+router.post('/categories/seed-apparel', async (req, res) => {
+  try {
+    const created = [];
+    const updated = [];
+
+    for (const [index, parent] of APPAREL_CATEGORY_PRESET.entries()) {
+      const [parentCategory, wasCreated] = await Category.findOrCreate({
+        where: { slug: parent.slug },
+        defaults: {
+          name: parent.name,
+          slug: parent.slug,
+          description: parent.description,
+          sortOrder: parent.sortOrder ?? (index + 1) * 10,
+          parentId: null,
+          isActive: true,
+        },
+      });
+
+      if (wasCreated) created.push(parent.slug);
+      else {
+        await parentCategory.update({
+          name: parent.name,
+          description: parent.description,
+          sortOrder: parent.sortOrder ?? parentCategory.sortOrder,
+          isActive: true,
+        });
+        updated.push(parent.slug);
+      }
+
+      for (const [subIndex, child] of (parent.subcategories || []).entries()) {
+        const [subCategory, childCreated] = await Category.findOrCreate({
+          where: { slug: child.slug },
+          defaults: {
+            name: child.name,
+            slug: child.slug,
+            parentId: parentCategory.id,
+            sortOrder: (parent.sortOrder ?? (index + 1) * 10) + subIndex + 1,
+            isActive: true,
+          },
+        });
+
+        if (childCreated) created.push(child.slug);
+        else {
+          await subCategory.update({
+            name: child.name,
+            parentId: parentCategory.id,
+            isActive: true,
+          });
+          updated.push(child.slug);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Apparel category preset synchronized',
+      data: { created, updated },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

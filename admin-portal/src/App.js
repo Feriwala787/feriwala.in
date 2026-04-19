@@ -11,6 +11,7 @@ import Users from './pages/Users';
 import Categories from './pages/Categories';
 import Orders from './pages/Orders';
 import ShopProducts from './pages/ShopProducts';
+import ShopOpsNotice from './pages/ShopOpsNotice';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -32,6 +33,7 @@ function AppRoutes() {
         <Route path="users" element={<Users />} />
         <Route path="categories" element={<Categories />} />
         <Route path="orders" element={<Orders />} />
+        <Route path="operations" element={<ShopOpsNotice />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -48,4 +50,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-

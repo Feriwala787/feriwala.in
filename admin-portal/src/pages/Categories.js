@@ -42,6 +42,16 @@ export default function Categories() {
     }
   };
 
+  const loadApparelPreset = async () => {
+    try {
+      await api.post('/admin/categories/seed-apparel');
+      toast.success('Category presets synced');
+      fetchCategories();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load apparel preset');
+    }
+  };
+
   return (
     <div>
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Categories</h2>
@@ -53,6 +63,13 @@ export default function Categories() {
               <h3 className="font-semibold text-gray-800 mb-4">
                 {editing ? 'Edit Category' : 'Add Category'}
               </h3>
+              <button
+                type="button"
+                onClick={loadApparelPreset}
+                className="mb-4 w-full px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100"
+              >
+                Load category presets (apparel + other major groups)
+              </button>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
@@ -128,4 +145,3 @@ export default function Categories() {
     </div>
   );
 }
-

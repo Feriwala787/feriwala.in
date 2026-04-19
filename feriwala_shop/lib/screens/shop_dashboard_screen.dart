@@ -89,6 +89,8 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
                   onTap: () => Navigator.pushNamed(context, '/promos')),
               _ActionTile(icon: Icons.delivery_dining, title: 'Delivery', subtitle: 'Assign and track deliveries',
                   onTap: () => Navigator.pushNamed(context, '/delivery')),
+              _ActionTile(icon: Icons.keyboard_return, title: 'Returns', subtitle: 'Review return requests and plan day-end pickups',
+                  onTap: () => Navigator.pushNamed(context, '/returns')),
             ],
           ),
         ),

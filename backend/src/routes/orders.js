@@ -12,6 +12,7 @@ const DeliveryTask = require('../models/pg/DeliveryTask');
 const { sequelize } = require('../database/postgres');
 const { generateOrderNumber, generateInvoiceNumber, generateOtp } = require('../utils/helpers');
 const { Op } = require('sequelize');
+const { createOrAssignDeliveryTask } = require('../services/deliveryTaskService');
 
 // Place order (customer)
 router.post('/', authenticate, authorize('customer'), [
@@ -324,6 +325,10 @@ router.put('/:id/status', authenticate, authorize('shop_admin', 'admin'), async 
     }
 
     await order.update(updates);
+
+    if (status === 'ready_for_pickup') {
+      await createOrAssignDeliveryTask({ orderId: order.id, io: req.app.get('io') });
+    }
 
     // Notify via socket
     const io = req.app.get('io');

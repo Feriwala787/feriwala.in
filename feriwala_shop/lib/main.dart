@@ -11,6 +11,7 @@ import 'screens/order_detail_screen.dart';
 import 'screens/shop_promos_screen.dart';
 import 'screens/shop_inventory_screen.dart';
 import 'screens/delivery_management_screen.dart';
+import 'screens/shop_returns_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,7 @@ class FeriwalaShopApp extends StatelessWidget {
           '/promos': (context) => const ShopPromosScreen(),
           '/inventory': (context) => const ShopInventoryScreen(),
           '/delivery': (context) => const DeliveryManagementScreen(),
+          '/returns': (context) => const ShopReturnsScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/order-detail') {

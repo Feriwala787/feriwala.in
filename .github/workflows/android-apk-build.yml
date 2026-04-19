@@ -1,0 +1,61 @@
+name: Build Android APKs
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'feriwala_customer/**'
+      - 'feriwala_shop/**'
+      - 'feriwala_delivery/**'
+      - '.github/workflows/android-apk-build.yml'
+  pull_request:
+    paths:
+      - 'feriwala_customer/**'
+      - 'feriwala_shop/**'
+      - 'feriwala_delivery/**'
+      - '.github/workflows/android-apk-build.yml'
+
+jobs:
+  build-apks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - feriwala_customer
+          - feriwala_shop
+          - feriwala_delivery
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ matrix.app }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-debug-apk
+          path: ${{ matrix.app }}/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
