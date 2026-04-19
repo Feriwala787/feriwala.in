@@ -4,7 +4,21 @@ const User = require('../models/mongo/User');
 const DeliveryAgentProfile = require('../models/mongo/DeliveryAgentProfile');
 const { generateTokens, generateLoginId } = require('../utils/helpers');
 const { authenticate } = require('../middleware/auth');
+const { isMongoReady } = require('../database/mongodb');
 const jwt = require('jsonwebtoken');
+
+function requireMongoReady(req, res, next) {
+  if (!isMongoReady()) {
+    res.set('Retry-After', '5');
+    return res.status(503).json({
+      success: false,
+      message: 'Authentication service temporarily unavailable. Please retry shortly.',
+    });
+  }
+  return next();
+}
+
+router.use(requireMongoReady);
 
 // Register
 router.post('/register', [

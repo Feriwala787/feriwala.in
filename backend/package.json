@@ -8,7 +8,7 @@
     "dev": "nodemon src/server.js",
     "migrate": "node src/database/migrate.js",
     "seed": "node src/database/seed.js",
-    "test": "node --test tests/smoke.test.js",
+    "test": "node --test tests/smoke.test.js tests/health.integration.test.js",
     "smoke": "node --check src/server.js && node --check src/database/mongodb.js && node --check src/database/postgres.js"
   },
   "dependencies": {

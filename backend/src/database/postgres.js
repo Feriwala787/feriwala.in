@@ -8,11 +8,14 @@ const sequelize = new Sequelize(
     host: process.env.PG_HOST || 'localhost',
     port: process.env.PG_PORT || 5432,
     dialect: 'postgres',
+    dialectOptions: {
+      connectTimeout: parseInt(process.env.PG_CONNECT_TIMEOUT_MS || '5000', 10),
+    },
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
       max: 20,
       min: 5,
-      acquire: 30000,
+      acquire: parseInt(process.env.PG_POOL_ACQUIRE_TIMEOUT_MS || '10000', 10),
       idle: 10000,
     },
   }
