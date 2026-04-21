@@ -1,5 +1,7 @@
 # Credentials & secrets
 backend/.env
+deployment/.env
+deployment/backend.env
 *.pem
 *.key
 *.p12
@@ -46,5 +48,9 @@ Thumbs.db
 # PM2
 .pm2/
 
-deployment/.env
-deployment/backend.env
+# APK downloads
+apk-downloads/
+
+# AWS CLI
+aws/
+awscliv2.zip

@@ -34,7 +34,8 @@ Delivering clothes in minutes.
 
 ## Server
 
-- Public IPv4: 13.233.227.15
+- Instance: `Node-js-1` (AWS Lightsail, ap-south-1)
+- Public IPv4: 65.2.9.216
 - Public IPv6: 2406:da1a:19e:d100:a0e2:d3b3:4b57:29ef
 
 ## Deployment

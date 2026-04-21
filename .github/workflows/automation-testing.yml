@@ -59,6 +59,7 @@ jobs:
       - name: Build admin portal
         run: CI=false npm run build
 
+
   flutter-tests:
     name: Flutter Tests (${{ matrix.app }})
     runs-on: ubuntu-latest
