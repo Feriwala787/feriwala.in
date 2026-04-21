@@ -51,6 +51,7 @@ Shop.hasMany(Invoice, { foreignKey: 'shopId', as: 'invoices' });
 Order.hasMany(DeliveryTask, { foreignKey: 'orderId', as: 'deliveryTasks' });
 DeliveryTask.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
 Shop.hasMany(DeliveryTask, { foreignKey: 'shopId', as: 'deliveryTasks' });
+DeliveryTask.belongsTo(Shop, { foreignKey: 'shopId', as: 'shop' });
 
 // Order -> ReturnRequest
 Order.hasMany(ReturnRequest, { foreignKey: 'orderId', as: 'returnRequests' });
