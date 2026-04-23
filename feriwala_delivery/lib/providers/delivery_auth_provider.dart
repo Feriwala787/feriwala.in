@@ -38,7 +38,7 @@ class DeliveryAuthProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final res = await _api.post('/auth/login', body: {'email': email, 'password': password});
+      final res = await _api.post('/auth/login', body: {'credential': email, 'password': password});
       _user = res['data']['user'];
       if (_user!['role'] != 'delivery_agent') throw Exception('Delivery agent access only');
       await _api.setToken(res['data']['accessToken']);

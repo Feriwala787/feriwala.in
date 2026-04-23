@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+export PATH="/opt/nix/store/9kfgh5k0frl2vkdvcvdmsfg0cmsm02nz-openssh-9.9p2/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_ENV_FILE="${SCRIPT_DIR}/.env"
 APP_ENV_FILE="${APP_ENV_FILE:-${SCRIPT_DIR}/backend.env}"
@@ -30,8 +32,7 @@ source_nonempty_env_file "$DEPLOY_ENV_FILE"
 
 SERVER_HOST="${SERVER_HOST:-65.2.9.216}"
 SSH_USER="${SSH_USER:-bitnami}"
-KEY_PATH="${KEY_PATH:-./feriwala-key.pem}"
-SSH_CERT_PATH="${SSH_CERT_PATH:-${KEY_PATH}-cert.pub}"
+KEY_PATH="${KEY_PATH:-./new-key.pem}"
 REMOTE_DIR="${REMOTE_DIR:-/home/bitnami/feriwala}"
 TEMP_KEY_DIR=""
 
@@ -44,32 +45,16 @@ if { [ ! -s "$KEY_PATH" ] || [ ! -f "$KEY_PATH" ]; } && command -v aws >/dev/nul
     --region "${AWS_REGION:-ap-south-1}" \
     --instance-name "$AWS_LIGHTSAIL_INSTANCE_NAME" \
     > "$ACCESS_JSON"
-  python - "$ACCESS_JSON" "$TEMP_KEY_DIR" <<'PY'
-import json
-import os
-import sys
-from pathlib import Path
-access_path = Path(sys.argv[1])
-out_dir = Path(sys.argv[2])
-payload = json.loads(access_path.read_text())['accessDetails']
-(out_dir / 'lightsail.pem').write_text(payload['privateKey'])
-cert = payload.get('certKey', '')
-if cert:
-    (out_dir / 'lightsail-cert.pub').write_text(cert + '\n')
-if payload.get('ipAddress'):
-    print(payload['ipAddress'])
-PY
-  SERVER_HOST="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["accessDetails"].get("ipAddress",""))' "$ACCESS_JSON")"
-  SSH_USER="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["accessDetails"].get("username","bitnami"))' "$ACCESS_JSON")"
+  jq -r '.accessDetails.privateKey' "$ACCESS_JSON" > "$TEMP_KEY_DIR/lightsail.pem"
+  chmod 600 "$TEMP_KEY_DIR/lightsail.pem"
+
+  SERVER_HOST=$(jq -r '.accessDetails.ipAddress' "$ACCESS_JSON")
+  SSH_USER=$(jq -r '.accessDetails.username' "$ACCESS_JSON")
   KEY_PATH="$TEMP_KEY_DIR/lightsail.pem"
-  SSH_CERT_PATH="$TEMP_KEY_DIR/lightsail-cert.pub"
 fi
 
 SERVER="${SSH_USER}@${SERVER_HOST}"
 SSH_BASE="ssh -o StrictHostKeyChecking=no -i $KEY_PATH"
-if [ -f "$SSH_CERT_PATH" ]; then
-  SSH_BASE="$SSH_BASE -o CertificateFile=$SSH_CERT_PATH"
-fi
 RSYNC_SSH="$SSH_BASE"
 
 echo "=== Feriwala Deployment ==="
@@ -108,14 +93,14 @@ rsync -avz --delete \
 
 # 3. Sync deployment configs
 echo ">> Syncing deployment configs..."
-eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$SCRIPT_DIR/ecosystem.config.js" "$SCRIPT_DIR/remote-setup.sh" "$SCRIPT_DIR/setup-server.sh" "$SERVER:$REMOTE_DIR/deployment/"
-eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$SCRIPT_DIR/nginx.conf" "$SERVER:/tmp/feriwala-nginx.conf"
+eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" "$SCRIPT_DIR/ecosystem.config.js" "$SCRIPT_DIR/remote-setup.sh" "$SCRIPT_DIR/setup-server.sh" "$SERVER:$REMOTE_DIR/deployment/"
+eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" "$SCRIPT_DIR/nginx.conf" "$SERVER:/tmp/feriwala-nginx.conf"
 
 if [ -f "$APP_ENV_FILE" ]; then
-  eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$APP_ENV_FILE" "$SERVER:$REMOTE_DIR/deployment/.env"
+  eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" "$APP_ENV_FILE" "$SERVER:$REMOTE_DIR/deployment/.env"
 elif [ -f "$DEPLOY_ENV_FILE" ] && grep -q "^MONGODB_URI=" "$DEPLOY_ENV_FILE"; then
   echo ">> APP_ENV_FILE not found; using legacy deployment/.env as backend env."
-  eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" ${SSH_CERT_PATH:+-o CertificateFile="$SSH_CERT_PATH"} "$DEPLOY_ENV_FILE" "$SERVER:$REMOTE_DIR/deployment/.env"
+  eval scp -o StrictHostKeyChecking=no -i "$KEY_PATH" "$DEPLOY_ENV_FILE" "$SERVER:$REMOTE_DIR/deployment/.env"
 else
   echo "Missing app env file. Create deployment/backend.env (from deployment/backend.env.example) or set APP_ENV_FILE."
   exit 1

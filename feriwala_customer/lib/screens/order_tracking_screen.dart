@@ -90,7 +90,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<int>(
-                  value: selectedItemId,
+                  initialValue: selectedItemId,
                   decoration: const InputDecoration(labelText: 'Select item'),
                   items: items
                       .map((item) => DropdownMenuItem<int>(
@@ -102,7 +102,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: returnType,
+                  initialValue: returnType,
                   decoration: const InputDecoration(labelText: 'Request type'),
                   items: const [
                     DropdownMenuItem(value: 'return', child: Text('Return (refund to bank)')),

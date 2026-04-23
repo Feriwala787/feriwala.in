@@ -54,3 +54,14 @@ apk-downloads/
 # AWS CLI
 aws/
 awscliv2.zip
+
+# Generated platform folders (web added via flutter create)
+**/linux/
+**/macos/
+**/windows/
+
+# Duplicate scripts
+start_apps.sh
+
+# Lock files
+backend/package-lock.json

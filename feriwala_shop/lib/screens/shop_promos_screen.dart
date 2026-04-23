@@ -51,7 +51,7 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
                 TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder())),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: type,
+                  initialValue: type,
                   decoration: const InputDecoration(border: OutlineInputBorder()),
                   items: const [
                     DropdownMenuItem(value: 'percentage', child: Text('Percentage')),
@@ -134,7 +134,7 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
                             await ShopApiService().put('/promos/${p['id']}', body: {'isActive': v});
                             _loadPromos();
                           },
-                          activeColor: const Color(0xFFF47721),
+                          activeThumbColor: const Color(0xFFF47721),
                         ),
                       ),
                     );

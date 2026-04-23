@@ -39,7 +39,7 @@ class ShopAuthProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final res = await _api.post('/auth/login', body: {'email': email, 'password': password});
+      final res = await _api.post('/auth/login', body: {'credential': email, 'password': password});
       _user = res['data']['user'];
       if (_user!['role'] != 'shop_admin') throw Exception('Shop admin access only');
       _shopId = _user?['shopId'];

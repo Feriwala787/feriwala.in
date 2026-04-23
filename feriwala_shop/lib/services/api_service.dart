@@ -7,7 +7,7 @@ class ShopApiService {
   factory ShopApiService() => _instance;
   ShopApiService._internal();
 
-  static const String baseUrl = 'http://13.233.227.15:3000/api';
+  static const String baseUrl = 'https://65.2.9.216/api';
   String? _token;
 
   Future<void> init() async {

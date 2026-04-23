@@ -33,7 +33,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     try {
       final res = await _api.post('/auth/login', body: {
-        'email': email,
+        'credential': email,
         'password': password,
       });
       _user = res['data']['user'];

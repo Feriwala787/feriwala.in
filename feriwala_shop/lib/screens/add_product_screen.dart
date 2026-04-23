@@ -90,7 +90,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
-                value: _categoryId,
+                initialValue: _categoryId,
                 decoration: const InputDecoration(labelText: 'Category *', border: OutlineInputBorder()),
                 items: _categories.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'] as int, child: Text(c['name']))).toList(),
                 onChanged: (v) => setState(() => _categoryId = v),
@@ -98,7 +98,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _gender,
+                initialValue: _gender,
                 decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
                 items: ['men', 'women', 'unisex', 'kids', 'boys', 'girls']
                     .map((g) => DropdownMenuItem(value: g, child: Text(g.toUpperCase())))

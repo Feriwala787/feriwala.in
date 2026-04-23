@@ -48,7 +48,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               Switch(
                 value: auth.isOnline,
                 onChanged: (_) => auth.toggleOnline(),
-                activeColor: Colors.green,
+                activeThumbColor: Colors.green,
               ),
             ],
           ),

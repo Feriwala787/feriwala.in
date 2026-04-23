@@ -99,7 +99,7 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                           trailing: Switch(
                             value: p['isActive'] ?? true,
                             onChanged: (_) => _toggleProduct(p['id'], p['isActive'] ?? true),
-                            activeColor: const Color(0xFFF47721),
+                            activeThumbColor: const Color(0xFFF47721),
                           ),
                         ),
                       );
