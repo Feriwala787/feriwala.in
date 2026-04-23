@@ -205,22 +205,32 @@ router.put('/:id/inventory', authenticate, authorize('shop_admin', 'admin'), asy
   }
 });
 
-// Upload product images
-router.post('/:id/images', authenticate, authorize('shop_admin', 'admin'),
-  upload.array('images', 5), async (req, res) => {
-    try {
-      const product = await Product.findByPk(req.params.id);
-      if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
+// Upload product images — POST /:id/images or /:id/media
+async function handleImageUpload(req, res) {
+  try {
+    const product = await Product.findByPk(req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Product not found' });
 
-      const imageUrls = req.files.map(f => `/uploads/${f.filename}`);
-      const currentImages = product.images || [];
-      await product.update({ images: [...currentImages, ...imageUrls] });
-
-      res.json({ success: true, data: product });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+    if (req.user.role === 'shop_admin' && req.user.shopId !== product.shopId) {
+      return res.status(403).json({ success: false, message: 'Not your product' });
     }
-  });
+
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files.length) return res.status(400).json({ success: false, message: 'No files uploaded' });
+
+    // multer-s3 sets file.location to the public S3 URL
+    const imageUrls = files.map(f => f.location);
+    const currentImages = product.images || [];
+    await product.update({ images: [...currentImages, ...imageUrls] });
+
+    res.json({ success: true, data: product });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+router.post('/:id/images', authenticate, authorize('shop_admin', 'admin'), upload.array('images', 5), handleImageUpload);
+router.post('/:id/media', authenticate, authorize('shop_admin', 'admin'), upload.array('images', 5), handleImageUpload);
 
 // Get categories
 router.get('/categories/all', async (req, res) => {
