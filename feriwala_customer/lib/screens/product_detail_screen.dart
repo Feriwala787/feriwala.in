@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
 
@@ -13,8 +16,10 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Map<String, dynamic>? _product;
+  Map<String, dynamic>? _shop;
   bool _loading = true;
   int _quantity = 1;
+  String? _selectedSize;
 
   Map<String, dynamic> get _attributes {
     final raw = _product?['attributes'];
@@ -23,19 +28,65 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return const {};
   }
 
+  List<String> get _availableSizes {
+    final list = _attributes['availableSizes'];
+    if (list is List) return list.map((e) => e.toString()).toList();
+    final sizeString = (_product?['size'] ?? '').toString();
+    if (sizeString.isEmpty) return [];
+    return sizeString.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  Map<String, dynamic> get _sizeInventories {
+    final raw = _attributes['sizeInventories'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((key, value) => MapEntry(key.toString(), value));
+    return const {};
+  }
+
+  int _stockForSize(String size) {
+    final value = _sizeInventories[size];
+    if (value == null) return (_product?['inventory'] as List?)?.isNotEmpty == true ? ((_product!['inventory'][0]['quantity'] ?? 0) as num).toInt() : 0;
+    return int.tryParse(value.toString()) ?? 0;
+  }
+
   @override
   void initState() {
     super.initState();
     _loadProduct();
   }
 
+  Future<void> _saveRecentlyViewed() async {
+    if (_product == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList('recent_products') ?? [];
+    final entry = jsonEncode({
+      'id': _product!['id'],
+      'name': _product!['name'],
+      'image': (_product!['images'] as List?)?.isNotEmpty == true ? _product!['images'][0] : null,
+      'sellingPrice': _product!['sellingPrice'],
+    });
+    list.removeWhere((e) => e.contains('"id":${_product!['id']}'));
+    list.insert(0, entry);
+    await prefs.setStringList('recent_products', list.take(12).toList());
+  }
+
   Future<void> _loadProduct() async {
     try {
       final res = await ApiService().get('/products/${widget.productId}');
+      final product = res['data'];
+      Map<String, dynamic>? shop;
+      if (product['shopId'] != null) {
+        final shopRes = await ApiService().get('/shops/${product['shopId']}');
+        shop = shopRes['data'];
+      }
       setState(() {
-        _product = res['data'];
+        _product = product;
+        _shop = shop;
+        final sizes = _availableSizes;
+        if (sizes.isNotEmpty) _selectedSize = sizes.first;
         _loading = false;
       });
+      _saveRecentlyViewed();
     } catch (e) {
       setState(() => _loading = false);
     }
@@ -43,6 +94,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _addToCart() {
     if (_product == null) return;
+    if (_availableSizes.isNotEmpty && (_selectedSize == null || _stockForSize(_selectedSize!) <= 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selected size is out of stock'), backgroundColor: Colors.orange));
+      return;
+    }
+
     final cart = context.read<CartProvider>();
     cart.addItem(
       CartItem(
@@ -50,7 +106,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         name: _product!['name'],
         price: double.parse(_product!['sellingPrice'].toString()),
         image: (_product!['images'] as List?)?.isNotEmpty == true ? _product!['images'][0] : null,
-        size: _product!['size'],
+        size: _selectedSize ?? _product!['size'],
         color: _product!['color'],
         quantity: _quantity,
       ),
@@ -63,6 +119,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cart = context.watch<CartProvider>();
+    final selectedStock = _selectedSize != null ? _stockForSize(_selectedSize!) : null;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_product?['name'] ?? 'Product'),
@@ -78,7 +137,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Images
                       SizedBox(
                         height: 350,
                         child: (_product!['images'] as List?)?.isNotEmpty == true
@@ -106,8 +164,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             const SizedBox(height: 4),
                             Text(_product!['name'], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
-
-                            // Price
                             Row(
                               children: [
                                 Text('₹${_product!['sellingPrice']}',
@@ -116,95 +172,57 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 if (_product!['mrp'].toString() != _product!['sellingPrice'].toString())
                                   Text('₹${_product!['mrp']}',
                                       style: const TextStyle(fontSize: 16, decoration: TextDecoration.lineThrough, color: Colors.grey)),
-                                const SizedBox(width: 8),
-                                if (_product!['discount'] != null)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(color: Colors.green[100], borderRadius: BorderRadius.circular(4)),
-                                    child: Text('${double.parse(_product!['discount'].toString()).toStringAsFixed(0)}% OFF',
-                                        style: TextStyle(color: Colors.green[800], fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ),
                               ],
                             ),
-                            const SizedBox(height: 16),
-
-                            // Details
-                            if (_product!['size'] != null) _DetailRow(label: 'Size', value: _product!['size']),
-                            if (_product!['color'] != null) _DetailRow(label: 'Color', value: _product!['color']),
-                            if (_product!['material'] != null) _DetailRow(label: 'Material', value: _product!['material']),
-                            if (_product!['gender'] != null) _DetailRow(label: 'For', value: _product!['gender']),
-                            if (_attributes['productType'] != null) _DetailRow(label: 'Type', value: _attributes['productType']),
-                            if (_attributes['fit'] != null) _DetailRow(label: 'Fit', value: _attributes['fit']),
-                            if (_attributes['pattern'] != null) _DetailRow(label: 'Pattern', value: _attributes['pattern']),
-                            if (_attributes['sleeveType'] != null) _DetailRow(label: 'Sleeve', value: _attributes['sleeveType']),
-                            if (_attributes['neckType'] != null) _DetailRow(label: 'Neck', value: _attributes['neckType']),
-                            if (_attributes['occasion'] != null) _DetailRow(label: 'Occasion', value: _attributes['occasion']),
-
-                            // Stock
-                            if (_product!['inventory'] != null && (_product!['inventory'] as List).isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  (_product!['inventory'][0]['quantity'] ?? 0) > 0 ? 'In Stock' : 'Out of Stock',
-                                  style: TextStyle(
-                                    color: (_product!['inventory'][0]['quantity'] ?? 0) > 0 ? Colors.green : Colors.red,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                            const SizedBox(height: 10),
+                            if (_shop != null)
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.delivery_dining, color: Color(0xFFF47721)),
+                                    const SizedBox(width: 8),
+                                    Text('Delivery in ${_product!['estimatedDeliveryMinutes'] ?? 30} mins • Fee ₹${_shop!['deliveryFee'] ?? 0}'),
+                                  ],
                                 ),
                               ),
-
+                            const SizedBox(height: 12),
+                            if (_availableSizes.isNotEmpty) ...[
+                              const Text('Select Size', style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                children: _availableSizes.map((size) {
+                                  final stock = _stockForSize(size);
+                                  final disabled = stock <= 0;
+                                  return ChoiceChip(
+                                    label: Text(disabled ? '$size (Out)' : size),
+                                    selected: _selectedSize == size,
+                                    onSelected: disabled ? null : (_) => setState(() => _selectedSize = size),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            if (selectedStock != null)
+                              Text(selectedStock > 0 ? 'In Stock: $selectedStock' : 'Out of Stock',
+                                  style: TextStyle(color: selectedStock > 0 ? Colors.green : Colors.red)),
                             const SizedBox(height: 16),
-                            if (_attributes['careInstructions'] != null || _attributes['sizeChartUrl'] != null) ...[
-                              const Text('Care & Sizing', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              if (_attributes['careInstructions'] != null)
-                                _DetailRow(label: 'Care', value: _attributes['careInstructions']),
-                              if (_attributes['sizeChartUrl'] != null)
-                                _DetailRow(label: 'Size Chart', value: _attributes['sizeChartUrl']),
-                              const SizedBox(height: 12),
-                            ],
-
-                            if (_attributes['countryOfOrigin'] != null ||
-                                _attributes['manufacturerDetails'] != null ||
-                                _attributes['returnPolicy'] != null ||
-                                _attributes['deliveryTimeline'] != null ||
-                                _attributes['shippingWeight'] != null ||
-                                _attributes['packageDimensions'] != null ||
-                                _attributes['gstRate'] != null) ...[
-                              const Text('Shipping & Policy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              if (_attributes['countryOfOrigin'] != null)
-                                _DetailRow(label: 'Origin', value: _attributes['countryOfOrigin']),
-                              if (_attributes['manufacturerDetails'] != null)
-                                _DetailRow(label: 'Manufacturer', value: _attributes['manufacturerDetails']),
-                              if (_attributes['returnPolicy'] != null)
-                                _DetailRow(label: 'Return', value: _attributes['returnPolicy']),
-                              if (_attributes['deliveryTimeline'] != null)
-                                _DetailRow(label: 'Delivery', value: _attributes['deliveryTimeline']),
-                              if (_attributes['shippingWeight'] != null)
-                                _DetailRow(label: 'Weight', value: _attributes['shippingWeight']),
-                              if (_attributes['packageDimensions'] != null)
-                                _DetailRow(label: 'Dimensions', value: _attributes['packageDimensions']),
-                              if (_attributes['gstRate'] != null)
-                                _DetailRow(label: 'GST', value: '${_attributes['gstRate']}%'),
-                              const SizedBox(height: 12),
-                            ],
-
                             if (_product!['description'] != null) ...[
                               const Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
                               Text(_product!['description'], style: const TextStyle(color: Colors.grey, height: 1.5)),
                             ],
-
                             const SizedBox(height: 24),
-
-                            // Quantity
                             Row(
                               children: [
                                 const Text('Quantity:', style: TextStyle(fontWeight: FontWeight.w500)),
                                 const SizedBox(width: 16),
                                 IconButton(
-                                  onPressed: () => setState(() { if (_quantity > 1) _quantity--; }),
+                                  onPressed: () => setState(() {
+                                    if (_quantity > 1) _quantity--;
+                                  }),
                                   icon: const Icon(Icons.remove_circle_outline),
                                 ),
                                 Text('$_quantity', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -227,39 +245,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 color: Colors.white,
                 boxShadow: [BoxShadow(color: Colors.grey.withAlpha(50), blurRadius: 8, offset: const Offset(0, -2))],
               ),
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _addToCart,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF47721),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                children: [
+                  if (cart.itemCount > 0)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.pushNamed(context, '/cart'),
+                        icon: const Icon(Icons.shopping_cart),
+                        label: Text('Cart (${cart.itemCount})'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFF47721),
+                          side: const BorderSide(color: Color(0xFFF47721)),
+                          minimumSize: const Size.fromHeight(50),
+                        ),
+                      ),
+                    ),
+                  if (cart.itemCount > 0) const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: (selectedStock != null && selectedStock <= 0) ? null : _addToCart,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF47721),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text((selectedStock != null && selectedStock <= 0) ? 'Out of Stock' : 'Add to Cart',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
                   ),
-                  child: const Text('Add to Cart', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
+                ],
               ),
             )
           : null,
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _DetailRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          SizedBox(width: 80, child: Text(label, style: const TextStyle(color: Colors.grey))),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
-        ],
-      ),
     );
   }
 }

@@ -13,6 +13,7 @@ class OrderTrackingScreen extends StatefulWidget {
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   Map<String, dynamic>? _order;
   List<dynamic> _returnRequests = [];
+  Map<String, dynamic>? _deliveryStatus;
   bool _loading = true;
   final _socketService = SocketService();
 
@@ -45,10 +46,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     try {
       final res = await ApiService().get('/orders/${widget.orderId}');
       final returnsRes = await ApiService().get('/delivery/returns/my');
+      final deliveryRes = await ApiService().get('/delivery/order/${widget.orderId}/status');
       final allReturns = returnsRes['data'] as List? ?? [];
       setState(() {
         _order = res['data'];
         _returnRequests = allReturns.where((item) => item['orderId'] == widget.orderId).toList();
+        _deliveryStatus = deliveryRes['data'];
         _loading = false;
       });
     } catch (e) {
@@ -60,6 +63,59 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final status = _order?['status'] ?? 'pending';
     final index = _statusSteps.indexOf(status);
     return index >= 0 ? index : 0;
+  }
+
+  Future<void> _cancelOrder() async {
+    if (_order == null) return;
+    final reasonController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel this order?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('You can cancel only before dispatch.'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Cancel Order'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ApiService().put('/orders/${_order!['id']}/cancel', body: {
+        'reason': reasonController.text.trim(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order cancelled successfully')),
+      );
+      _loadOrder();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _showReturnDialog() async {
@@ -178,6 +234,15 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    String _freshnessText(dynamic updatedAt) {
+      if (updatedAt == null) return 'Location unavailable';
+      final parsed = DateTime.tryParse(updatedAt.toString());
+      if (parsed == null) return 'Location unavailable';
+      final mins = DateTime.now().difference(parsed.toLocal()).inMinutes;
+      if (mins <= 1) return 'Live now';
+      return 'Updated ${mins}m ago';
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text(_order?['orderNumber'] ?? 'Order Details')),
       body: _loading
@@ -283,6 +348,43 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+
+                      if (_deliveryStatus?['agent'] != null)
+                        Card(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Assigned Delivery Partner', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 8),
+                                Text(_deliveryStatus!['agent']['name'] ?? 'Delivery Agent'),
+                                Text(_deliveryStatus!['agent']['phone'] ?? '', style: const TextStyle(color: Colors.grey)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _freshnessText(_deliveryStatus!['agent']['locationUpdatedAt']),
+                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      if (_deliveryStatus?['agent'] != null) const SizedBox(height: 12),
+
+                      if (_order!['status'] == 'pending' || _order!['status'] == 'confirmed')
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: _cancelOrder,
+                            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                            child: const Text('Cancel Order'),
+                          ),
+                        ),
+
+                      if (_order!['status'] == 'pending' || _order!['status'] == 'confirmed')
+                        const SizedBox(height: 12),
 
                       // Request return (if delivered)
                       if (_order!['status'] == 'delivered')

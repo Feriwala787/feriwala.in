@@ -22,9 +22,19 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
 
   Future<void> _loadPromos() async {
     final shopId = context.read<ShopAuthProvider>().shopId;
+    if (shopId == null) {
+      setState(() {
+        _promos = [];
+        _loading = false;
+      });
+      return;
+    }
     try {
       final res = await ShopApiService().get('/promos/manage/$shopId');
-      setState(() { _promos = res['data'] ?? []; _loading = false; });
+      setState(() {
+        _promos = res['data'] ?? [];
+        _loading = false;
+      });
     } catch (e) {
       setState(() => _loading = false);
     }
@@ -35,7 +45,10 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
     final descCtrl = TextEditingController();
     final valueCtrl = TextEditingController();
     final minCtrl = TextEditingController(text: '0');
+    final usageLimitCtrl = TextEditingController();
+    final perUserLimitCtrl = TextEditingController(text: '1');
     String type = 'percentage';
+    bool firstOrderOnly = false;
 
     showDialog(
       context: context,
@@ -60,11 +73,26 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
                   onChanged: (v) => setDialogState(() => type = v!),
                 ),
                 const SizedBox(height: 8),
-                TextField(controller: valueCtrl, keyboardType: TextInputType.number,
+                TextField(
+                    controller: valueCtrl,
+                    keyboardType: TextInputType.number,
                     decoration: InputDecoration(labelText: type == 'percentage' ? 'Discount %' : 'Discount ₹', border: const OutlineInputBorder())),
                 const SizedBox(height: 8),
                 TextField(controller: minCtrl, keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Min Order Amount', border: OutlineInputBorder())),
+                const SizedBox(height: 8),
+                TextField(controller: usageLimitCtrl, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Total Usage Limit (optional)', border: OutlineInputBorder())),
+                const SizedBox(height: 8),
+                TextField(controller: perUserLimitCtrl, keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Per User Limit', border: OutlineInputBorder())),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: firstOrderOnly,
+                  title: const Text('First order only'),
+                  onChanged: (v) => setDialogState(() => firstOrderOnly = v),
+                ),
               ],
             ),
           ),
@@ -73,6 +101,13 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
             ElevatedButton(
               onPressed: () async {
                 try {
+                  final shopId = context.read<ShopAuthProvider>().shopId;
+                  if (shopId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Warehouse/shop assignment missing')),
+                    );
+                    return;
+                  }
                   final now = DateTime.now();
                   await ShopApiService().post('/promos', body: {
                     'code': codeCtrl.text.trim(),
@@ -80,6 +115,9 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
                     'discountType': type,
                     'discountValue': double.parse(valueCtrl.text),
                     'minOrderAmount': double.parse(minCtrl.text),
+                    'usageLimit': usageLimitCtrl.text.trim().isEmpty ? null : int.parse(usageLimitCtrl.text),
+                    'perUserLimit': int.parse(perUserLimitCtrl.text),
+                    'firstOrderOnly': firstOrderOnly,
                     'validFrom': now.toIso8601String(),
                     'validTo': now.add(const Duration(days: 30)).toIso8601String(),
                   });
@@ -126,7 +164,8 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
                         ),
                         title: Text(p['code'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text(
-                          '${p['discountType'] == 'percentage' ? '${p['discountValue']}%' : '₹${p['discountValue']}'} off | Min: ₹${p['minOrderAmount']}',
+                          '${p['discountType'] == 'percentage' ? '${p['discountValue']}%' : '₹${p['discountValue']}'} off | Min: ₹${p['minOrderAmount']}\n'
+                          'Per user: ${p['perUserLimit'] ?? 1} | ${p['firstOrderOnly'] == true ? 'First-order only' : 'All users'}',
                         ),
                         trailing: Switch(
                           value: p['isActive'] ?? false,

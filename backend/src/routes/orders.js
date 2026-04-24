@@ -227,6 +227,76 @@ router.get('/my-orders', authenticate, authorize('customer'), async (req, res) =
   }
 });
 
+// Cancel order (customer)
+router.put('/:id/cancel', authenticate, authorize('customer'), async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const order = await Order.findByPk(req.params.id, { transaction: t });
+    if (!order) {
+      await t.rollback();
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.customerId !== req.user._id.toString()) {
+      await t.rollback();
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    if (!['pending', 'confirmed'].includes(order.status)) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Order cannot be cancelled after ${order.status.replaceAll('_', ' ')}`,
+      });
+    }
+
+    const items = await OrderItem.findAll({ where: { orderId: order.id }, transaction: t });
+    for (const item of items) {
+      const inv = await Inventory.findOne({
+        where: { productId: item.productId, shopId: order.shopId },
+        transaction: t,
+      });
+      if (!inv) continue;
+
+      const releaseReserved = Math.min(inv.reservedQuantity, item.quantity);
+      const updates = {
+        reservedQuantity: Math.max(0, inv.reservedQuantity - releaseReserved),
+      };
+
+      // If already confirmed, quantity was already deducted from stock.
+      if (order.status === 'confirmed') {
+        updates.quantity = inv.quantity + item.quantity;
+      }
+
+      await inv.update(updates, { transaction: t });
+    }
+
+    if (order.promoCodeId) {
+      const promo = await PromoCode.findByPk(order.promoCodeId, { transaction: t });
+      if (promo) {
+        await promo.update({ usedCount: Math.max(0, promo.usedCount - 1) }, { transaction: t });
+      }
+    }
+
+    await order.update({
+      status: 'cancelled',
+      cancelledAt: new Date(),
+      cancelReason: (req.body.reason || 'Cancelled by customer').toString().slice(0, 500),
+    }, { transaction: t });
+
+    await t.commit();
+
+    const io = req.app.get('io');
+    io.to(`customer_${order.customerId}`).emit('order_status', { orderId: order.id, status: 'cancelled' });
+    io.to(`shop_${order.shopId}`).emit('order_status', { orderId: order.id, status: 'cancelled' });
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Get shop orders (shop admin)
 router.get('/shop/:shopId', authenticate, authorize('shop_admin', 'admin'), async (req, res) => {
   try {

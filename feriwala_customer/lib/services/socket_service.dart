@@ -9,6 +9,8 @@ class SocketService {
   IO.Socket? _socket;
 
   void connect() {
+    if (_socket != null) return;
+
     _socket = IO.io(AppConfig.socketUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': true,
@@ -35,6 +37,8 @@ class SocketService {
   }
 
   void dispose() {
+    _socket?.disconnect();
     _socket?.dispose();
+    _socket = null;
   }
 }

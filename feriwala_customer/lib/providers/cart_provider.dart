@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../services/api_service.dart';
 
 class CartItem {
@@ -32,6 +34,53 @@ class CartItem {
 
 class CartProvider extends ChangeNotifier {
   final List<CartItem> _items = [];
+
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('cart_state');
+    if (raw == null) return;
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      _shopId = map['shopId'] as int?;
+      _promoCode = map['promoCode'] as String?;
+      _discount = (map['discount'] as num?)?.toDouble() ?? 0;
+      final items = (map['items'] as List? ?? []);
+      _items.clear();
+      for (final i in items) {
+        _items.add(CartItem(
+          productId: i['productId'],
+          name: i['name'],
+          price: (i['price'] as num).toDouble(),
+          image: i['image'],
+          size: i['size'],
+          color: i['color'],
+          quantity: i['quantity'] ?? 1,
+        ));
+      }
+      notifyListeners();
+    } catch (_) {
+      await prefs.remove('cart_state');
+    }
+  }
+
+  Future<void> _persist() async {
+    final prefs = await SharedPreferences.getInstance();
+    final map = {
+      'shopId': _shopId,
+      'promoCode': _promoCode,
+      'discount': _discount,
+      'items': _items.map((i) => {
+        'productId': i.productId,
+        'name': i.name,
+        'price': i.price,
+        'image': i.image,
+        'size': i.size,
+        'color': i.color,
+        'quantity': i.quantity,
+      }).toList(),
+    };
+    await prefs.setString('cart_state', jsonEncode(map));
+  }
   int? _shopId;
   String? _promoCode;
   double _discount = 0;
@@ -65,6 +114,7 @@ class CartProvider extends ChangeNotifier {
       _items.add(item);
     }
     notifyListeners();
+    _persist();
   }
 
   void updateQuantity(int index, int quantity) {
@@ -79,6 +129,7 @@ class CartProvider extends ChangeNotifier {
       _discount = 0;
     }
     notifyListeners();
+    _persist();
   }
 
   void removeItem(int index) {
@@ -89,6 +140,7 @@ class CartProvider extends ChangeNotifier {
       _discount = 0;
     }
     notifyListeners();
+    _persist();
   }
 
   Future<void> applyPromo(String code) async {
@@ -102,10 +154,12 @@ class CartProvider extends ChangeNotifier {
       _promoCode = code;
       _discount = (res['data']['calculatedDiscount'] as num).toDouble();
       notifyListeners();
+      _persist();
     } catch (e) {
       _promoCode = null;
       _discount = 0;
       notifyListeners();
+      _persist();
       rethrow;
     }
   }
@@ -116,5 +170,6 @@ class CartProvider extends ChangeNotifier {
     _promoCode = null;
     _discount = 0;
     notifyListeners();
+    _persist();
   }
 }

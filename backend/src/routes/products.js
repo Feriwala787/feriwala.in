@@ -63,12 +63,19 @@ router.get('/', async (req, res) => {
     const allowedSorts = ['createdAt', 'sellingPrice', 'avgRating', 'name'];
     const orderField = allowedSorts.includes(sortBy) ? sortBy : 'createdAt';
 
+    const inventoryInclude = { model: Inventory, as: 'inventory', attributes: ['quantity', 'reservedQuantity', 'shopId'] };
+    if (shopId) {
+      // Warehouse-scoped inventory for shop app screens
+      inventoryInclude.where = { shopId: parseInt(shopId) };
+      inventoryInclude.required = false;
+    }
+
     const products = await Product.findAndCountAll({
       where,
       include: [
         { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
         { model: Shop, as: 'shop', attributes: ['id', 'name', 'code'] },
-        { model: Inventory, as: 'inventory', attributes: ['quantity', 'reservedQuantity'] },
+        inventoryInclude,
       ],
       limit: parseInt(limit),
       offset,
@@ -84,6 +91,20 @@ router.get('/', async (req, res) => {
         pages: Math.ceil(products.count / parseInt(limit)),
       },
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get categories
+router.get('/categories/all', async (req, res) => {
+  try {
+    const categories = await Category.findAll({
+      where: { isActive: true },
+      include: [{ model: Category, as: 'subcategories', where: { isActive: true }, required: false }],
+      order: [['sortOrder', 'ASC']],
+    });
+    res.json({ success: true, data: categories });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -231,19 +252,5 @@ async function handleImageUpload(req, res) {
 
 router.post('/:id/images', authenticate, authorize('shop_admin', 'admin'), upload.array('images', 5), handleImageUpload);
 router.post('/:id/media', authenticate, authorize('shop_admin', 'admin'), upload.array('images', 5), handleImageUpload);
-
-// Get categories
-router.get('/categories/all', async (req, res) => {
-  try {
-    const categories = await Category.findAll({
-      where: { isActive: true },
-      include: [{ model: Category, as: 'subcategories', where: { isActive: true }, required: false }],
-      order: [['sortOrder', 'ASC']],
-    });
-    res.json({ success: true, data: categories });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
 
 module.exports = router;
