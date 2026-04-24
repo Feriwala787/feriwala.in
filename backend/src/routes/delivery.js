@@ -11,6 +11,102 @@ const User = require('../models/mongo/User');
 const { generateOtp, calculateDistance, generateOrderNumber } = require('../utils/helpers');
 const { Op } = require('sequelize');
 const { createOrAssignDeliveryTask } = require('../services/deliveryTaskService');
+const MAX_ACTIVE_TASKS_PER_AGENT = 4;
+const STALLED_TASK_MINUTES = 20;
+const LONG_TRANSIT_MINUTES = 45;
+
+async function getAgentLoadMap(agentIds = []) {
+  if (agentIds.length === 0) return {};
+  const rows = await DeliveryTask.findAll({
+    attributes: ['agentId', 'status', 'createdAt', 'shopId'],
+    where: {
+      agentId: { [Op.in]: agentIds },
+      status: { [Op.notIn]: ['completed', 'cancelled', 'failed'] },
+    },
+  });
+
+  const map = {};
+  for (const row of rows) {
+    const id = row.agentId;
+    if (!map[id]) map[id] = { activeTaskCount: 0, hasRecentSameShopTask: false };
+    map[id].activeTaskCount += 1;
+  }
+  return map;
+}
+
+function getSlaStatus(task) {
+  const now = Date.now();
+  const createdAt = new Date(task.createdAt).getTime();
+  const mins = Math.floor((now - createdAt) / 60000);
+  if (['assigned', 'accepted', 'picking'].includes(task.status) && mins >= STALLED_TASK_MINUTES) {
+    return { level: 'warning', reason: 'pickup_delayed', ageMinutes: mins };
+  }
+  if (task.status === 'in_transit' && mins >= LONG_TRANSIT_MINUTES) {
+    return { level: 'critical', reason: 'in_transit_delayed', ageMinutes: mins };
+  }
+  return { level: 'normal', reason: 'on_time', ageMinutes: mins };
+}
+
+async function getNearbyAvailableAgents({ shopId, shopLat, shopLng }) {
+  const availableAgents = await DeliveryAgentProfile.find({
+    isOnline: true,
+    isAvailable: true,
+    assignedShopId: { $in: [shopId, null] },
+  }).populate({ path: 'userId', model: 'User' });
+
+  const agentIds = availableAgents.map((a) => a.userId?._id?.toString()).filter(Boolean);
+  const loadMap = await getAgentLoadMap(agentIds);
+
+  return availableAgents.map((agent) => {
+    const lat = agent.currentLocation?.latitude;
+    const lng = agent.currentLocation?.longitude;
+    const distance = (lat && lng)
+      ? calculateDistance(shopLat, shopLng, lat, lng)
+      : Infinity;
+    const id = agent.userId?._id?.toString();
+    const activeTaskCount = loadMap[id]?.activeTaskCount ?? 0;
+    const routeBonus = activeTaskCount > 0 ? 0.5 : 0;
+    const score = Number.isFinite(distance) ? Math.max(0, distance - routeBonus) : Infinity;
+    return { agent, distance, activeTaskCount, canTakeMoreTasks: activeTaskCount < MAX_ACTIVE_TASKS_PER_AGENT, score };
+  }).sort((a, b) => a.distance - b.distance);
+}
+
+// Nearby available agents for a shop (shop + customer visibility)
+router.get('/agents/nearby/:shopId', authenticate, authorize('shop_admin', 'admin', 'customer'), async (req, res) => {
+  try {
+    const shopId = parseInt(req.params.shopId);
+    if (!shopId) return res.status(400).json({ success: false, message: 'Invalid shopId' });
+
+    const shop = await Shop.findByPk(shopId);
+    if (!shop) return res.status(404).json({ success: false, message: 'Shop not found' });
+    if (req.user.role === 'shop_admin' && req.user.shopId !== shopId) {
+      return res.status(403).json({ success: false, message: 'Not your shop' });
+    }
+
+    const shopLat = parseFloat(shop.latitude);
+    const shopLng = parseFloat(shop.longitude);
+    if (Number.isNaN(shopLat) || Number.isNaN(shopLng)) {
+      return res.status(400).json({ success: false, message: 'Shop location missing' });
+    }
+
+    const agents = await getNearbyAvailableAgents({ shopId, shopLat, shopLng });
+    const data = agents.map(({ agent, distance, activeTaskCount, canTakeMoreTasks }) => ({
+      agentId: agent.userId?._id?.toString(),
+      name: agent.userId?.name || 'Delivery Agent',
+      phone: agent.userId?.phone || null,
+      vehicleType: agent.vehicleType,
+      rating: agent.rating,
+      distanceKm: Number.isFinite(distance) ? Number(distance.toFixed(2)) : null,
+      activeTaskCount,
+      canTakeMoreTasks,
+      currentLocation: agent.currentLocation || null,
+    }));
+
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // Create delivery task (shop assigns)
 router.post('/tasks', authenticate, authorize('shop_admin', 'admin'), [
@@ -39,21 +135,12 @@ router.post('/tasks', authenticate, authorize('shop_admin', 'admin'), [
     const shopLat = parseFloat(order.shop.latitude);
     const shopLng = parseFloat(order.shop.longitude);
 
-    const availableAgents = await DeliveryAgentProfile.find({
-      isOnline: true,
-      isAvailable: true,
-      assignedShopId: { $in: [order.shopId, null] },
-    }).populate({ path: 'userId', model: 'User' });
+    const agentsWithDistance = await getNearbyAvailableAgents({ shopId: order.shopId, shopLat, shopLng });
 
-    // Sort by distance
-    const agentsWithDistance = availableAgents.map(agent => ({
-      agent,
-      distance: agent.currentLocation?.latitude
-        ? calculateDistance(shopLat, shopLng, agent.currentLocation.latitude, agent.currentLocation.longitude)
-        : Infinity,
-    })).sort((a, b) => a.distance - b.distance);
-
-    const selectedAgent = agentsWithDistance.length > 0 ? agentsWithDistance[0] : null;
+    const candidateAgents = agentsWithDistance
+      .filter((a) => a.canTakeMoreTasks)
+      .sort((a, b) => a.score - b.score);
+    const selectedAgent = candidateAgents.length > 0 ? candidateAgents[0] : null;
 
     const pickupLocation = {
       address: `${order.shop.addressLine1}, ${order.shop.city}`,
@@ -165,8 +252,12 @@ router.put('/tasks/:id/status', authenticate, authorize('delivery_agent'), async
     if (status === 'picked_up' && otp !== task.pickupOtp) {
       return res.status(400).json({ success: false, message: 'Invalid pickup OTP' });
     }
-    if (status === 'completed' && task.taskType === 'delivery' && otp !== task.deliveryOtp) {
-      return res.status(400).json({ success: false, message: 'Invalid delivery OTP' });
+    if (status === 'completed' && task.taskType === 'delivery') {
+      const orderForOtp = await Order.findByPk(task.orderId, { attributes: ['paymentMethod'] });
+      const requiresOtp = orderForOtp && orderForOtp.paymentMethod !== 'cod';
+      if (requiresOtp && otp !== task.deliveryOtp) {
+        return res.status(400).json({ success: false, message: 'Invalid delivery OTP' });
+      }
     }
 
     const updates = { status };
@@ -326,6 +417,63 @@ router.get('/returns/my', authenticate, authorize('customer'), async (req, res) 
   }
 });
 
+// Order delivery status with assigned agent details (customer + shop)
+router.get('/order/:orderId/status', authenticate, authorize('customer', 'shop_admin', 'admin'), async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.orderId);
+    const order = await Order.findByPk(orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    if (req.user.role === 'customer' && order.customerId !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    if (req.user.role === 'shop_admin' && req.user.shopId !== order.shopId) {
+      return res.status(403).json({ success: false, message: 'Not your order' });
+    }
+
+    const task = await DeliveryTask.findOne({
+      where: {
+        orderId,
+        status: { [Op.notIn]: ['cancelled', 'failed'] },
+      },
+      order: [['createdAt', 'DESC']],
+    });
+    if (!task) return res.json({ success: true, data: null });
+
+    let agent = null;
+    if (task.agentId) {
+      const profile = await DeliveryAgentProfile.findOne({ userId: task.agentId }).populate({ path: 'userId', model: 'User' });
+      if (profile) {
+        agent = {
+          agentId: profile.userId?._id?.toString(),
+          name: profile.userId?.name || 'Delivery Agent',
+          phone: profile.userId?.phone || null,
+          rating: profile.rating,
+          vehicleType: profile.vehicleType,
+          locationUpdatedAt: profile.currentLocation?.updatedAt || null,
+          currentLocation: profile.currentLocation || null,
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        taskId: task.id,
+        taskType: task.taskType,
+        status: task.status,
+        assignedAt: task.assignedAt,
+        estimatedMinutes: task.estimatedMinutes,
+        distanceKm: task.distanceKm,
+        sla: getSlaStatus(task),
+        agent,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Shop return requests list
 router.get('/returns/shop/:shopId', authenticate, authorize('shop_admin', 'admin'), async (req, res) => {
   try {
@@ -426,7 +574,7 @@ router.put('/returns/:id/process', authenticate, authorize('shop_admin', 'admin'
 // Shop creates day-end return pickup plan in batch
 router.post('/returns/day-end-plan', authenticate, authorize('shop_admin', 'admin'), async (req, res) => {
   try {
-    const { shopId, returnRequestIds = [], pickupDate } = req.body;
+    const { shopId, returnRequestIds = [], pickupDate, preferredAgentId } = req.body;
     const parsedShopId = parseInt(shopId);
     if (!parsedShopId) return res.status(400).json({ success: false, message: 'shopId required' });
     if (req.user.role === 'shop_admin' && req.user.shopId !== parsedShopId) {
@@ -449,6 +597,24 @@ router.post('/returns/day-end-plan', authenticate, authorize('shop_admin', 'admi
     const batchDate = pickupDate ? new Date(pickupDate) : new Date();
     const io = req.app.get('io');
     const createdTasks = [];
+    let assignedCount = 0;
+    let selectedAgent = null;
+
+    if (preferredAgentId) {
+      selectedAgent = await DeliveryAgentProfile.findOne({
+        userId: preferredAgentId,
+        isOnline: true,
+        assignedShopId: { $in: [parsedShopId, null] },
+      }).populate({ path: 'userId', model: 'User' });
+      if (!selectedAgent) {
+        return res.status(400).json({ success: false, message: 'Preferred agent is not available' });
+      }
+      const load = await getAgentLoadMap([preferredAgentId.toString()]);
+      const activeCount = load[preferredAgentId.toString()]?.activeTaskCount ?? 0;
+      if (activeCount >= MAX_ACTIVE_TASKS_PER_AGENT) {
+        return res.status(400).json({ success: false, message: 'Preferred agent reached active task capacity' });
+      }
+    }
 
     for (const request of requests) {
       const order = await Order.findByPk(request.orderId, { include: [{ model: Shop, as: 'shop' }] });
@@ -463,11 +629,31 @@ router.post('/returns/day-end-plan', authenticate, authorize('shop_admin', 'admi
       });
 
       if (!existingTask) {
+        let taskAgentId = null;
+        let taskStatus = 'pending';
+        let taskDistanceKm = null;
+        let taskEstimatedMinutes = null;
+
+        if (selectedAgent) {
+          taskAgentId = selectedAgent.userId?._id?.toString() || null;
+          taskStatus = taskAgentId ? 'assigned' : 'pending';
+          const aLat = selectedAgent.currentLocation?.latitude;
+          const aLng = selectedAgent.currentLocation?.longitude;
+          const sLat = parseFloat(order.shop.latitude);
+          const sLng = parseFloat(order.shop.longitude);
+          if (aLat != null && aLng != null && !Number.isNaN(sLat) && !Number.isNaN(sLng)) {
+            const d = calculateDistance(sLat, sLng, aLat, aLng);
+            taskDistanceKm = d;
+            taskEstimatedMinutes = Math.ceil((d / 20) * 60);
+          }
+        }
+
         const task = await DeliveryTask.create({
           orderId: request.orderId,
           shopId: request.shopId,
           taskType: 'return_pickup',
-          status: 'pending',
+          agentId: taskAgentId,
+          status: taskStatus,
           pickupLocation: {
             address: `${order.shop.addressLine1}, ${order.shop.city}`,
             latitude: parseFloat(order.shop.latitude),
@@ -477,8 +663,20 @@ router.post('/returns/day-end-plan', authenticate, authorize('shop_admin', 'admi
           pickupOtp: generateOtp(),
           deliveryOtp: generateOtp(),
           notes: `Day-end return pickup batch: ${batchDate.toISOString()}`,
+          assignedAt: taskAgentId ? new Date() : null,
+          distanceKm: taskDistanceKm,
+          estimatedMinutes: taskEstimatedMinutes,
         });
         createdTasks.push(task.id);
+
+        if (taskAgentId) {
+          assignedCount += 1;
+          io.to(`agent_${taskAgentId}`).emit('new_task', {
+            taskId: task.id,
+            taskType: task.taskType,
+            orderId: task.orderId,
+          });
+        }
       }
 
       await request.update({ status: 'pickup_assigned', pickupBatchDate: batchDate });
@@ -488,7 +686,12 @@ router.post('/returns/day-end-plan', authenticate, authorize('shop_admin', 'admi
       shopId: parsedShopId,
       pickupBatchDate: batchDate,
       count: requests.length,
+      assignedCount,
     });
+
+    if (selectedAgent) {
+      await DeliveryAgentProfile.findByIdAndUpdate(selectedAgent._id, { isAvailable: false });
+    }
 
     res.json({
       success: true,
@@ -498,6 +701,8 @@ router.post('/returns/day-end-plan', authenticate, authorize('shop_admin', 'admi
         pickupBatchDate: batchDate,
         returnRequestCount: requests.length,
         createdTaskIds: createdTasks,
+        assignedCount,
+        preferredAgentId: selectedAgent?.userId?._id?.toString() || null,
       },
     });
   } catch (error) {
@@ -532,6 +737,75 @@ router.put('/returns/:id/verify', authenticate, authorize('delivery_agent'), asy
   }
 });
 
+// Manual task reassignment (shop/admin)
+router.put('/tasks/:id/reassign', authenticate, authorize('shop_admin', 'admin'), async (req, res) => {
+  try {
+    const task = await DeliveryTask.findByPk(req.params.id, { include: [{ model: Shop, as: 'shop' }] });
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    if (req.user.role === 'shop_admin' && req.user.shopId !== task.shopId) {
+      return res.status(403).json({ success: false, message: 'Not your task' });
+    }
+    if (['completed', 'cancelled', 'failed'].includes(task.status)) {
+      return res.status(400).json({ success: false, message: 'Cannot reassign closed tasks' });
+    }
+
+    const { newAgentId } = req.body;
+    const shopLat = parseFloat(task.shop?.latitude);
+    const shopLng = parseFloat(task.shop?.longitude);
+    let targetAgentProfile = null;
+
+    if (newAgentId) {
+      targetAgentProfile = await DeliveryAgentProfile.findOne({
+        userId: newAgentId,
+        isOnline: true,
+        assignedShopId: { $in: [task.shopId, null] },
+      }).populate({ path: 'userId', model: 'User' });
+    } else {
+      const candidates = await getNearbyAvailableAgents({ shopId: task.shopId, shopLat, shopLng });
+      targetAgentProfile = candidates.find((c) => c.canTakeMoreTasks)?.agent || null;
+    }
+
+    if (!targetAgentProfile || !targetAgentProfile.userId?._id) {
+      return res.status(400).json({ success: false, message: 'No eligible agent available for reassignment' });
+    }
+
+    const newAgentIdString = targetAgentProfile.userId._id.toString();
+    if (task.agentId && task.agentId !== newAgentIdString) {
+      await DeliveryAgentProfile.findOneAndUpdate({ userId: task.agentId }, { isAvailable: true });
+    }
+
+    const aLat = targetAgentProfile.currentLocation?.latitude;
+    const aLng = targetAgentProfile.currentLocation?.longitude;
+    const distanceKm = (aLat != null && aLng != null && !Number.isNaN(shopLat) && !Number.isNaN(shopLng))
+      ? calculateDistance(shopLat, shopLng, aLat, aLng)
+      : null;
+
+    await task.update({
+      agentId: newAgentIdString,
+      status: 'assigned',
+      assignedAt: new Date(),
+      acceptedAt: null,
+      distanceKm,
+      estimatedMinutes: distanceKm ? Math.ceil((distanceKm / 20) * 60) : null,
+    });
+
+    await DeliveryAgentProfile.findByIdAndUpdate(targetAgentProfile._id, { isAvailable: false });
+
+    const io = req.app.get('io');
+    io.to(`agent_${newAgentIdString}`).emit('new_task', {
+      taskId: task.id,
+      taskType: task.taskType,
+      orderId: task.orderId,
+      reassigned: true,
+    });
+    io.to(`shop_${task.shopId}`).emit('task_reassigned', { taskId: task.id, agentId: newAgentIdString });
+
+    res.json({ success: true, data: task });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Shop tasks (for shop app)
 router.get('/shop-tasks/:shopId', authenticate, authorize('shop_admin', 'admin'), async (req, res) => {
   try {
@@ -550,9 +824,14 @@ router.get('/shop-tasks/:shopId', authenticate, authorize('shop_admin', 'admin')
       order: [['createdAt', 'DESC']],
     });
 
+    const data = tasks.rows.map((task) => ({
+      ...task.toJSON(),
+      sla: getSlaStatus(task),
+    }));
+
     res.json({
       success: true,
-      data: tasks.rows,
+      data,
       pagination: {
         total: tasks.count,
         page: parseInt(page),

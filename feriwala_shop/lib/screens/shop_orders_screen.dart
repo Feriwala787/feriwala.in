@@ -32,7 +32,10 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen> with SingleTickerPr
 
   Future<void> _loadOrders() async {
     final shopId = context.read<ShopAuthProvider>().shopId;
-    if (shopId == null) return;
+    if (shopId == null) {
+      setState(() => _loading = false);
+      return;
+    }
     setState(() => _loading = true);
     try {
       final params = <String, String>{'limit': '50'};
@@ -55,6 +58,12 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen> with SingleTickerPr
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
     }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override

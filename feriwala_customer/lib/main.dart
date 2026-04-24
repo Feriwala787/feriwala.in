@@ -28,7 +28,7 @@ class FeriwalaCustomerApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
-        ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider()..init()),
       ],
       child: MaterialApp(
         title: 'Feriwala',

@@ -117,7 +117,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               Text('Status: ${_task!['status'].toString().replaceAll('_', ' ').toUpperCase()}',
                                   style: const TextStyle(fontSize: 14, color: Colors.grey)),
                               if (_task!['estimatedMinutes'] != null)
-                                Text('ETA: ${_task!['estimatedMinutes']} min | ${_task!['estimatedDistance']?.toStringAsFixed(1)} km'),
+                                Text('ETA: ${_task!['estimatedMinutes']} min | ${_task!['distanceKm'] ?? '-'} km'),
                             ],
                           ),
                         ),
@@ -130,13 +130,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         child: ListTile(
                           leading: const Icon(Icons.store, color: Colors.blue),
                           title: const Text('Pickup Location'),
-                          subtitle: Text(_task!['pickupAddress'] ?? 'Shop location'),
+                          subtitle: Text(((_task!['pickupLocation'] as Map?)?['address'])?.toString() ?? 'Shop location'),
                           trailing: IconButton(
                             icon: const Icon(Icons.navigation, color: Color(0xFFF47721)),
                             onPressed: () {
-                              final lat = _task!['pickupLat'];
-                              final lng = _task!['pickupLng'];
-                              if (lat != null && lng != null) _openMaps(lat.toDouble(), lng.toDouble());
+                              final map = (_task!['pickupLocation'] as Map?) ?? const {};
+                              final lat = map['latitude'];
+                              final lng = map['longitude'];
+                              if (lat is num && lng is num) _openMaps(lat.toDouble(), lng.toDouble());
                             },
                           ),
                         ),
@@ -149,13 +150,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         child: ListTile(
                           leading: const Icon(Icons.location_on, color: Colors.red),
                           title: const Text('Drop Location'),
-                          subtitle: Text(_task!['dropAddress'] ?? 'Customer location'),
+                          subtitle: Text(((_task!['dropLocation'] as Map?)?['address'])?.toString() ?? 'Customer location'),
                           trailing: IconButton(
                             icon: const Icon(Icons.navigation, color: Color(0xFFF47721)),
                             onPressed: () {
-                              final lat = _task!['dropLat'];
-                              final lng = _task!['dropLng'];
-                              if (lat != null && lng != null) _openMaps(lat.toDouble(), lng.toDouble());
+                              final map = (_task!['dropLocation'] as Map?) ?? const {};
+                              final lat = map['latitude'];
+                              final lng = map['longitude'];
+                              if (lat is num && lng is num) _openMaps(lat.toDouble(), lng.toDouble());
                             },
                           ),
                         ),
@@ -192,6 +194,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   List<Widget> _buildActions() {
     final status = _task!['status'] as String;
+    final paymentMethod = _task?['order']?['paymentMethod']?.toString();
     final widgets = <Widget>[];
 
     if (status == 'accepted') {
@@ -204,7 +207,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       widgets.add(_actionButton('Start Delivery', Colors.deepOrange, () => _updateStatus('in_transit')));
     }
     if (status == 'in_transit') {
-      widgets.add(_actionButton('Verify Delivery OTP', Colors.green, () => _showOtpDialog('completed')));
+      if (paymentMethod == 'cod') {
+        widgets.add(_actionButton('Mark Delivered (COD)', Colors.green, () => _updateStatus('completed')));
+      } else {
+        widgets.add(_actionButton('Verify Delivery OTP', Colors.green, () => _showOtpDialog('completed')));
+      }
     }
 
     return widgets;

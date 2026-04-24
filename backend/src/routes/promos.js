@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
 const PromoCode = require('../models/pg/PromoCode');
+const Order = require('../models/pg/Order');
 const { Op } = require('sequelize');
 
 // Get available promos for a shop (public)
@@ -15,7 +16,7 @@ router.get('/shop/:shopId', async (req, res) => {
         validFrom: { [Op.lte]: now },
         validTo: { [Op.gte]: now },
       },
-      attributes: ['id', 'code', 'description', 'discountType', 'discountValue', 'minOrderAmount', 'maxDiscount', 'validTo'],
+      attributes: ['id', 'code', 'description', 'discountType', 'discountValue', 'minOrderAmount', 'maxDiscount', 'validTo', 'firstOrderOnly'],
     });
     res.json({ success: true, data: promos });
   } catch (error) {
@@ -72,7 +73,7 @@ router.put('/:id', authenticate, authorize('shop_admin', 'admin'), async (req, r
     const allowedFields = [
       'description', 'discountType', 'discountValue', 'minOrderAmount',
       'maxDiscount', 'usageLimit', 'perUserLimit', 'validFrom', 'validTo',
-      'isActive', 'applicableCategories',
+      'isActive', 'applicableCategories', 'firstOrderOnly',
     ];
 
     const updates = {};
@@ -111,6 +112,11 @@ router.post('/validate', authenticate, [
   body('orderAmount').isFloat({ min: 0 }),
 ], async (req, res) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
     const { code, shopId, orderAmount } = req.body;
     const now = new Date();
 
@@ -137,6 +143,34 @@ router.post('/validate', authenticate, [
 
     if (promo.usageLimit !== null && promo.usedCount >= promo.usageLimit) {
       return res.status(400).json({ success: false, message: 'Promo code usage limit reached' });
+    }
+
+
+    if (promo.perUserLimit !== null) {
+      const userUsageCount = await Order.count({
+        where: {
+          customerId: req.user._id.toString(),
+          promoCodeId: promo.id,
+          status: { [Op.notIn]: ['cancelled'] },
+        },
+      });
+      if (userUsageCount >= promo.perUserLimit) {
+        return res.status(400).json({ success: false, message: 'Per-user promo usage limit reached' });
+      }
+    }
+
+
+    if (promo.firstOrderOnly) {
+      const priorOrders = await Order.count({
+        where: {
+          customerId: req.user._id.toString(),
+          shopId: parseInt(shopId),
+          status: { [Op.notIn]: ['cancelled'] },
+        },
+      });
+      if (priorOrders > 0) {
+        return res.status(400).json({ success: false, message: 'This promo is valid for first order only' });
+      }
     }
 
     let discount;

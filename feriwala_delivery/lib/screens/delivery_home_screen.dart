@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:geolocator/geolocator.dart';
 import '../providers/delivery_auth_provider.dart';
 import '../services/api_service.dart';
 
@@ -14,11 +16,47 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   List<dynamic> _tasks = [];
   bool _loading = true;
   int _currentIndex = 0;
+  Timer? _locationSyncTimer;
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
+    _startLocationSync();
+  }
+
+  @override
+  void dispose() {
+    _locationSyncTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startLocationSync() {
+    _locationSyncTimer?.cancel();
+    _locationSyncTimer = Timer.periodic(const Duration(minutes: 1), (_) => _pushLocationIfOnline());
+    _pushLocationIfOnline();
+  }
+
+  Future<void> _pushLocationIfOnline() async {
+    final auth = context.read<DeliveryAuthProvider>();
+    if (!auth.isOnline) return;
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
+
+    try {
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      await DeliveryApiService().put('/delivery/location', body: {
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadTasks() async {
@@ -47,7 +85,10 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               Text(auth.isOnline ? 'Online' : 'Offline', style: const TextStyle(fontSize: 12)),
               Switch(
                 value: auth.isOnline,
-                onChanged: (_) => auth.toggleOnline(),
+                onChanged: (_) async {
+                  await auth.toggleOnline();
+                  _pushLocationIfOnline();
+                },
                 activeThumbColor: Colors.green,
               ),
             ],
@@ -183,7 +224,7 @@ class _TaskCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               if (task['estimatedMinutes'] != null)
-                Text('ETA: ${task['estimatedMinutes']} min | ${task['estimatedDistance']?.toStringAsFixed(1) ?? '-'} km'),
+                Text('ETA: ${task['estimatedMinutes']} min | ${task['distanceKm'] ?? '-'} km'),
               if (onAccept != null) ...[
                 const SizedBox(height: 8),
                 SizedBox(
