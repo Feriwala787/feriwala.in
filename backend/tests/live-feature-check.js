@@ -1,6 +1,6 @@
 const http = require('http');
 
-const baseUrl = process.env.API_BASE_URL || 'https://65.2.9.216/api';
+const baseUrl = process.env.API_BASE_URL || 'https://api.feriwala.in/api';
 
 function request(method, path, body, token) {
   return new Promise((resolve, reject) => {

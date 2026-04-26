@@ -7,7 +7,7 @@ class ShopApiService {
   factory ShopApiService() => _instance;
   ShopApiService._internal();
 
-  static const String baseUrl = 'https://65.2.9.216/api';
+  static const String baseUrl = 'https://api.feriwala.in/api';
   String? _token;
 
   Future<void> init() async {

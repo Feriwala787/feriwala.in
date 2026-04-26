@@ -9,7 +9,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const https = require('https');
 
-const BASE = process.env.API_BASE_URL || 'https://65.2.9.216/api';
+const BASE = process.env.API_BASE_URL || 'https://api.feriwala.in/api';
 const TIMEOUT = 15000;
 const tlsAgent = new https.Agent({ rejectUnauthorized: false });
 
