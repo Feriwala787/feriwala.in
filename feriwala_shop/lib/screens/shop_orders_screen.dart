@@ -111,7 +111,7 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen> with SingleTickerPr
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Text('${(order['items'] as List?)?.length ?? 0} items | ₹${order['total']}'),
+                                Text('${(order['items'] as List?)?.length ?? 0} items | INR ${order['total']}'),
                                 const SizedBox(height: 8),
                                 // Action buttons
                                 if (order['status'] == 'pending')

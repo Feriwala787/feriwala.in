@@ -166,11 +166,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                Text('₹${_product!['sellingPrice']}',
+                                Text('INR ${_product!['sellingPrice']}',
                                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                                 const SizedBox(width: 8),
                                 if (_product!['mrp'].toString() != _product!['sellingPrice'].toString())
-                                  Text('₹${_product!['mrp']}',
+                                  Text('INR ${_product!['mrp']}',
                                       style: const TextStyle(fontSize: 16, decoration: TextDecoration.lineThrough, color: Colors.grey)),
                               ],
                             ),
@@ -183,7 +183,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   children: [
                                     const Icon(Icons.delivery_dining, color: Color(0xFFF47721)),
                                     const SizedBox(width: 8),
-                                    Text('Delivery in ${_product!['estimatedDeliveryMinutes'] ?? 30} mins • Fee ₹${_shop!['deliveryFee'] ?? 0}'),
+                                    Text('Delivery in ${_product!['estimatedDeliveryMinutes'] ?? 30} mins • Fee INR ${_shop!['deliveryFee'] ?? 0}'),
                                   ],
                                 ),
                               ),

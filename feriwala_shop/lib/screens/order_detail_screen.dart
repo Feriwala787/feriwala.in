@@ -74,7 +74,7 @@ class _ShopOrderDetailScreenState extends State<ShopOrderDetailScreen> {
                             child: ListTile(
                               title: Text(item['productName'] ?? ''),
                               subtitle: Text('Qty: ${item['quantity']} | Size: ${item['size'] ?? '-'} | Color: ${item['color'] ?? '-'}'),
-                              trailing: Text('₹${item['total']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              trailing: Text('INR ${item['total']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           )),
                       const SizedBox(height: 12),
@@ -86,11 +86,11 @@ class _ShopOrderDetailScreenState extends State<ShopOrderDetailScreen> {
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             children: [
-                              _row('Subtotal', '₹${_order!['subtotal']}'),
-                              _row('Discount', '-₹${_order!['discount']}'),
-                              _row('Delivery Fee', '₹${_order!['deliveryFee']}'),
+                              _row('Subtotal', 'INR ${_order!['subtotal']}'),
+                              _row('Discount', '-INR ${_order!['discount']}'),
+                              _row('Delivery Fee', 'INR ${_order!['deliveryFee']}'),
                               const Divider(),
-                              _row('Total', '₹${_order!['total']}', bold: true),
+                              _row('Total', 'INR ${_order!['total']}', bold: true),
                               const SizedBox(height: 8),
                               _row('Payment', (_order!['paymentMethod'] ?? '').toString().toUpperCase()),
                             ],
@@ -158,7 +158,7 @@ class _ShopOrderDetailScreenState extends State<ShopOrderDetailScreen> {
                             child: ListTile(
                               leading: const Icon(Icons.receipt, color: Colors.green),
                               title: Text('Invoice: ${_order!['invoice']['invoiceNumber']}'),
-                              subtitle: Text('₹${_order!['invoice']['total']}'),
+                              subtitle: Text('INR ${_order!['invoice']['total']}'),
                             ),
                           ),
                         ),

@@ -234,7 +234,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String _freshnessText(dynamic updatedAt) {
+    String freshnessText(dynamic updatedAt) {
       if (updatedAt == null) return 'Location unavailable';
       final parsed = DateTime.tryParse(updatedAt.toString());
       if (parsed == null) return 'Location unavailable';
@@ -330,7 +330,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Expanded(child: Text('${item['productName']} x${item['quantity']}')),
-                                        Text('₹${item['total']}'),
+                                        Text('INR ${item['total']}'),
                                       ],
                                     ),
                                   )),
@@ -339,7 +339,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Text('₹${_order!['total']}',
+                                  Text('INR ${_order!['total']}',
                                       style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                                 ],
                               ),
@@ -363,7 +363,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                 Text(_deliveryStatus!['agent']['phone'] ?? '', style: const TextStyle(color: Colors.grey)),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _freshnessText(_deliveryStatus!['agent']['locationUpdatedAt']),
+                                  freshnessText(_deliveryStatus!['agent']['locationUpdatedAt']),
                                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                                 ),
                               ],

@@ -7,9 +7,11 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const https = require('https');
 
-const BASE = process.env.API_BASE_URL || 'http://65.2.9.216:3000/api';
+const BASE = process.env.API_BASE_URL || 'https://65.2.9.216/api';
 const TIMEOUT = 15000;
+const tlsAgent = new https.Agent({ rejectUnauthorized: false });
 
 // ─── HTTP helper ────────────────────────────────────────────────────────────
 async function req(method, path, body, token) {
@@ -370,14 +372,79 @@ test('GET /shops?page=1&limit=3 → respects pagination', async () => {
   assert.ok(r.body.data.length <= 3);
 });
 
-// ─── 12. Logout ──────────────────────────────────────────────────────────────
+// ─── 12. Order cancel ────────────────────────────────────────────────────────
+test('PUT /orders/:id/cancel → cancels pending order', async () => {
+  if (!state.customerToken || !state.productId || !state.productShopId) return;
+  const place = await req('POST', '/orders', {
+    shopId: state.productShopId,
+    items: [{ productId: state.productId, quantity: 1 }],
+    deliveryAddress: { label: 'Home', addressLine1: '123 Test St', city: 'Delhi', state: 'Delhi', pincode: '110001' },
+    paymentMethod: 'cod',
+  }, state.customerToken);
+  if (place.status !== 201) return;
+  const cancelOrderId = place.body.data?.id;
+  const r = await req('PUT', `/orders/${cancelOrderId}/cancel`, { reason: 'Changed my mind' }, state.customerToken);
+  assert.ok([200, 400, 503].includes(r.status), `cancel status ${r.status}: ${JSON.stringify(r.body)}`);
+  if (r.status === 200) assert.equal(r.body.data?.status, 'cancelled');
+});
+
+test('PUT /orders/:id/cancel → 401 without auth', async () => {
+  const r = await req('PUT', '/orders/999/cancel', { reason: 'test' });
+  assert.equal(r.status, 401);
+});
+
+// ─── 13. Delivery SLA + agent nearby ─────────────────────────────────────────
+test('GET /delivery/agents/nearby/:shopId → returns agent list', async () => {
+  if (!state.customerToken || !state.shopId) return;
+  const r = await req('GET', `/delivery/agents/nearby/${state.shopId}`, null, state.customerToken);
+  assert.ok([200, 400, 503].includes(r.status), `nearby agents status ${r.status}: ${JSON.stringify(r.body)}`);
+  if (r.status === 200) assert.ok(Array.isArray(r.body.data));
+});
+
+test('GET /delivery/agents/nearby/:shopId → 401 without auth', async () => {
+  const r = await req('GET', '/delivery/agents/nearby/1');
+  assert.equal(r.status, 401);
+});
+
+test('GET /delivery/order/:orderId/status → returns delivery status with SLA', async () => {
+  if (!state.customerToken || !state.orderId) return;
+  const r = await req('GET', `/delivery/order/${state.orderId}/status`, null, state.customerToken);
+  assert.ok([200, 404, 503].includes(r.status), `delivery status ${r.status}`);
+  if (r.status === 200 && r.body.data) {
+    assert.ok(r.body.data.sla, 'missing sla field');
+    assert.ok(['normal', 'warning', 'critical'].includes(r.body.data.sla.level));
+  }
+});
+
+// ─── 14. Task reassignment ────────────────────────────────────────────────────
+test('PUT /delivery/tasks/:id/reassign → 401 without auth', async () => {
+  const r = await req('PUT', '/delivery/tasks/1/reassign', { newAgentId: null });
+  assert.equal(r.status, 401);
+});
+
+// ─── 15. Promo management ─────────────────────────────────────────────────────
+test('GET /promos/shop/:shopId → returns public promos', async () => {
+  if (!state.shopId) return;
+  const r = await req('GET', `/promos/shop/${state.shopId}`);
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.body.data));
+});
+
+// ─── 16. Products /media route ───────────────────────────────────────────────
+test('POST /products/:id/media → 401 without auth', async () => {
+  if (!state.productId) return;
+  const r = await req('POST', `/products/${state.productId}/media`, {});
+  assert.equal(r.status, 401);
+});
+
+// ─── 17. Logout ──────────────────────────────────────────────────────────────
 test('POST /auth/logout → clears session', async () => {
   if (!state.customerToken) return;
   const r = await req('POST', '/auth/logout', {}, state.customerToken);
   assert.ok([200, 503].includes(r.status));
 });
 
-// ─── 13. 404 handler ─────────────────────────────────────────────────────────
+// ─── 18. 404 handler ─────────────────────────────────────────────────────────
 test('GET /api/nonexistent → 404', async () => {
   const r = await req('GET', '/nonexistent-route-xyz');
   assert.equal(r.status, 404);

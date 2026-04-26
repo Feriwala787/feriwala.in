@@ -58,7 +58,7 @@ class CartScreen extends StatelessWidget {
                                     Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(fontWeight: FontWeight.w500)),
                                     const SizedBox(height: 4),
-                                    Text('₹${item.price.toStringAsFixed(2)}',
+                                    Text('INR ${item.price.toStringAsFixed(2)}',
                                         style: const TextStyle(color: Color(0xFFF47721), fontWeight: FontWeight.bold)),
                                     if (item.size != null || item.color != null)
                                       Text('${item.size ?? ''} ${item.color ?? ''}'.trim(),
@@ -110,7 +110,7 @@ class CartScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Subtotal'),
-                          Text('₹${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                          Text('INR ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w500)),
                         ],
                       ),
                       if (cart.discount > 0) ...[
@@ -119,7 +119,7 @@ class CartScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('Discount (${cart.promoCode})', style: const TextStyle(color: Colors.green)),
-                            Text('-₹${cart.discount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
+                            Text('-INR ${cart.discount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
                           ],
                         ),
                       ],
@@ -128,7 +128,7 @@ class CartScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          Text('₹${cart.total.toStringAsFixed(2)}',
+                          Text('INR ${cart.total.toStringAsFixed(2)}',
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                         ],
                       ),

@@ -19,17 +19,16 @@ echo "=== Killing old servers ==="
 kill -9 $(lsof -ti tcp:8081,8082,8083 2>/dev/null) 2>/dev/null || true
 sleep 1
 
+SERVE=/home/user/.global_modules/bin/serve
+
 echo "=== Starting static servers ==="
-cd /home/user/dd/feriwala_shop/build/web
-nohup npx --yes serve -l 8081 -s . > /tmp/shop.log 2>&1 &
+nohup $SERVE -l 8081 -s /home/user/dd/feriwala_shop/build/web > /tmp/shop.log 2>&1 &
 echo "Shop PID: $!"
 
-cd /home/user/dd/feriwala_customer/build/web
-nohup npx --yes serve -l 8082 -s . > /tmp/customer.log 2>&1 &
+nohup $SERVE -l 8082 -s /home/user/dd/feriwala_customer/build/web > /tmp/customer.log 2>&1 &
 echo "Customer PID: $!"
 
-cd /home/user/dd/feriwala_delivery/build/web
-nohup npx --yes serve -l 8083 -s . > /tmp/delivery.log 2>&1 &
+nohup $SERVE -l 8083 -s /home/user/dd/feriwala_delivery/build/web > /tmp/delivery.log 2>&1 &
 echo "Delivery PID: $!"
 
 sleep 5

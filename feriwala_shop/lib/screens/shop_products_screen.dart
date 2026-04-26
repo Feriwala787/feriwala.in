@@ -140,7 +140,7 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                                   subtitle: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('₹${p['sellingPrice']} | Warehouse Stock: $stock'),
+                                      Text('INR ${p['sellingPrice']} | Warehouse Stock: $stock'),
                                       if (isLowStock)
                                         const Padding(
                                           padding: EdgeInsets.only(top: 2),

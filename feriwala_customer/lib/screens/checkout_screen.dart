@@ -238,7 +238,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ..._activePromos.map((promo) => Card(
                     child: ListTile(
                       title: Text(promo['code'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('${promo['description'] ?? ''}\nMin order ₹${promo['minOrderAmount']}'),
+                      subtitle: Text('${promo['description'] ?? ''}\nMin order INR ${promo['minOrderAmount']}'),
                       trailing: TextButton(
                         onPressed: () => _applyPromo(promo['code']),
                         child: const Text('Apply'),
@@ -261,24 +261,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(child: Text('${item.name} x${item.quantity}', maxLines: 1, overflow: TextOverflow.ellipsis)),
-                              Text('₹${item.total.toStringAsFixed(2)}'),
+                              Text('INR ${item.total.toStringAsFixed(2)}'),
                             ],
                           ),
                         )),
                     const Divider(),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       const Text('Subtotal'),
-                      Text('₹${cart.subtotal.toStringAsFixed(2)}'),
+                      Text('INR ${cart.subtotal.toStringAsFixed(2)}'),
                     ]),
                     if (cart.discount > 0)
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         const Text('Discount', style: TextStyle(color: Colors.green)),
-                        Text('-₹${cart.discount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
+                        Text('-INR ${cart.discount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
                       ]),
                     const Divider(),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       const Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text('₹${cart.total.toStringAsFixed(2)}',
+                      Text('INR ${cart.total.toStringAsFixed(2)}',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFFF47721))),
                     ]),
                   ],
@@ -301,11 +301,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             child: _placing
                 ? const CircularProgressIndicator(color: Colors.white)
-                : Text('Place Order - ₹${cart.total.toStringAsFixed(2)}',
+                : Text('Place Order - INR ${cart.total.toStringAsFixed(2)}',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ),
-      )),
+      ),
     );
   }
 }

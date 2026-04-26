@@ -146,7 +146,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('₹${order['total']}',
+                                        Text('INR ${order['total']}',
                                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFFF47721))),
                                         const Icon(Icons.chevron_right, color: Colors.grey),
                                       ],

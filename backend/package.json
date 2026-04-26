@@ -8,9 +8,9 @@
     "dev": "nodemon src/server.js",
     "migrate": "node src/database/migrate.js",
     "seed": "node src/database/seed.js",
-    "test": "node --test tests/smoke.test.js tests/health.integration.test.js",
-    "test:api": "node --test tests/api.integration.test.js",
-    "test:all": "node --test tests/smoke.test.js tests/health.integration.test.js tests/api.integration.test.js",
+    "test": "NODE_TLS_REJECT_UNAUTHORIZED=0 node --test tests/smoke.test.js tests/health.integration.test.js",
+    "test:api": "NODE_TLS_REJECT_UNAUTHORIZED=0 node --test tests/api.integration.test.js",
+    "test:all": "NODE_TLS_REJECT_UNAUTHORIZED=0 node --test tests/smoke.test.js tests/health.integration.test.js tests/api.integration.test.js",
     "smoke": "node --check src/server.js && node --check src/database/mongodb.js && node --check src/database/postgres.js"
   },
   "dependencies": {

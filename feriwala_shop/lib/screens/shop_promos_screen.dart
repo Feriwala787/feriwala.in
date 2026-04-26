@@ -76,7 +76,7 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
                 TextField(
                     controller: valueCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(labelText: type == 'percentage' ? 'Discount %' : 'Discount ₹', border: const OutlineInputBorder())),
+                    decoration: InputDecoration(labelText: type == 'percentage' ? 'Discount %' : 'Discount INR ', border: const OutlineInputBorder())),
                 const SizedBox(height: 8),
                 TextField(controller: minCtrl, keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Min Order Amount', border: OutlineInputBorder())),
@@ -164,7 +164,7 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
                         ),
                         title: Text(p['code'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text(
-                          '${p['discountType'] == 'percentage' ? '${p['discountValue']}%' : '₹${p['discountValue']}'} off | Min: ₹${p['minOrderAmount']}\n'
+                          '${p['discountType'] == 'percentage' ? '${p['discountValue']}%' : 'INR ${p['discountValue']}'} off | Min: INR ${p['minOrderAmount']}\n'
                           'Per user: ${p['perUserLimit'] ?? 1} | ${p['firstOrderOnly'] == true ? 'First-order only' : 'All users'}',
                         ),
                         trailing: Switch(

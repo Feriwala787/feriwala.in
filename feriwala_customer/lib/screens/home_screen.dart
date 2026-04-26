@@ -587,11 +587,11 @@ class _ProductCard extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
                   const SizedBox(height: 4),
                   Row(children: [
-                    Text('₹${product['sellingPrice']}',
+                    Text('INR ${product['sellingPrice']}',
                         style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                     const SizedBox(width: 4),
                     if (product['mrp'] != product['sellingPrice'])
-                      Text('₹${product['mrp']}',
+                      Text('INR ${product['mrp']}',
                           style: const TextStyle(decoration: TextDecoration.lineThrough, fontSize: 11, color: Colors.grey)),
                   ]),
                 ],
@@ -645,7 +645,7 @@ class _ProductGridItem extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
                   const SizedBox(height: 4),
                   Row(children: [
-                    Text('₹${product['sellingPrice']}',
+                    Text('INR ${product['sellingPrice']}',
                         style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                     const SizedBox(width: 4),
                     if (product['discount'] != null && double.tryParse(product['discount'].toString()) != null && double.parse(product['discount'].toString()) > 0)
