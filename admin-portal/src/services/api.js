@@ -5,27 +5,7 @@ const LEGACY_TOKEN_KEY = 'feriwala_admin_token';
 
 const resolveApiBase = () => {
   if (process.env.REACT_APP_API_URL) return process.env.REACT_APP_API_URL;
-
-  if (typeof window === 'undefined') {
-    return 'http://localhost:3000/api';
-  }
-
-  const { hostname, origin, protocol } = window.location;
-
-  if (hostname === '65.2.9.216') {
-    return `${origin}/api`;
-  }
-
-  if (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname.endsWith('.app.github.dev') ||
-    hostname.endsWith('.github.dev')
-  ) {
-    return 'http://65.2.9.216/api';
-  }
-
-  return protocol === 'http:' ? `${origin}/api` : 'http://65.2.9.216/api';
+  return 'https://api.feriwala.in/api';
 };
 
 const API_BASE = resolveApiBase();
