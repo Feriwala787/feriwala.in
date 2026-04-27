@@ -51,8 +51,8 @@ class DeliveryAuthProvider extends ChangeNotifier {
 
   Future<void> toggleOnline() async {
     try {
-      await _api.put('/delivery/online');
-      _isOnline = !_isOnline;
+      final res = await _api.put('/delivery/online');
+      _isOnline = res['data']?['isOnline'] == true;
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to toggle online: $e');

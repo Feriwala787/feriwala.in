@@ -13,6 +13,7 @@ const PromoCode = sequelize.define('PromoCode', {
   usageLimit: { type: DataTypes.INTEGER, defaultValue: null },
   usedCount: { type: DataTypes.INTEGER, defaultValue: 0 },
   perUserLimit: { type: DataTypes.INTEGER, defaultValue: 1 },
+  firstOrderOnly: { type: DataTypes.BOOLEAN, defaultValue: false },
   validFrom: { type: DataTypes.DATE, allowNull: false },
   validTo: { type: DataTypes.DATE, allowNull: false },
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },

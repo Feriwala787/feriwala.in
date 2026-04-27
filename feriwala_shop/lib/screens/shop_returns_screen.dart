@@ -13,6 +13,7 @@ class ShopReturnsScreen extends StatefulWidget {
 class _ShopReturnsScreenState extends State<ShopReturnsScreen> {
   bool _loading = true;
   List<dynamic> _returns = [];
+  List<dynamic> _nearbyAgents = [];
   final Set<int> _selected = <int>{};
 
   @override
@@ -26,8 +27,10 @@ class _ShopReturnsScreenState extends State<ShopReturnsScreen> {
     if (shopId == null) return;
     try {
       final res = await ShopApiService().get('/delivery/returns/shop/$shopId');
+      final agentsRes = await ShopApiService().get('/delivery/agents/nearby/$shopId');
       setState(() {
         _returns = res['data'] ?? [];
+        _nearbyAgents = agentsRes['data'] ?? [];
         _loading = false;
       });
     } catch (e) {
@@ -53,15 +56,51 @@ class _ShopReturnsScreenState extends State<ShopReturnsScreen> {
       return;
     }
 
+    String? preferredAgentId;
+    final selectedAgentLabel = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Assign pickup agent'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.auto_awesome),
+                title: const Text('Auto assign (nearest available)'),
+                onTap: () => Navigator.pop(ctx, ''),
+              ),
+              ..._nearbyAgents.map((agent) => ListTile(
+                    leading: const Icon(Icons.person_pin_circle),
+                    title: Text(agent['name'] ?? 'Delivery Agent'),
+                    subtitle: Text(
+                      '${agent['phone'] ?? ''} • ${(agent['distanceKm'] ?? '-')} km • ${agent['vehicleType'] ?? 'bike'}',
+                    ),
+                    onTap: () => Navigator.pop(ctx, agent['agentId']?.toString() ?? ''),
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (selectedAgentLabel == null) return;
+    if (selectedAgentLabel.isNotEmpty) {
+      preferredAgentId = selectedAgentLabel;
+    }
+
     try {
-      await ShopApiService().post('/delivery/returns/day-end-plan', body: {
+      final res = await ShopApiService().post('/delivery/returns/day-end-plan', body: {
         'shopId': shopId,
         'returnRequestIds': targetIds,
         'pickupDate': DateTime.now().toIso8601String(),
+        if (preferredAgentId != null) 'preferredAgentId': preferredAgentId,
       });
+      final assignedCount = res['data']?['assignedCount'] ?? 0;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Day-end return plan created for ${targetIds.length} request(s)')),
+        SnackBar(content: Text('Day-end plan created: ${targetIds.length} request(s), assigned: $assignedCount')),
       );
       _selected.clear();
       _loadReturns();
@@ -98,6 +137,14 @@ class _ShopReturnsScreenState extends State<ShopReturnsScreen> {
       appBar: AppBar(
         title: const Text('Return Requests'),
         actions: [
+          if (_nearbyAgents.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, top: 18),
+              child: Text(
+                '${_nearbyAgents.length} nearby agents',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.playlist_add_check),
             onPressed: _createDayEndPlan,

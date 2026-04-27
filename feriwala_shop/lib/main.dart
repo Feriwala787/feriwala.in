@@ -47,7 +47,7 @@ class FeriwalaShopApp extends StatelessWidget {
           '/login': (context) => const ShopLoginScreen(),
           '/dashboard': (context) => const ShopDashboardScreen(),
           '/products': (context) => const ShopProductsScreen(),
-          '/add-product': (context) => const AddProductScreen(),
+          '/products/add': (context) => const AddProductScreen(),
           '/orders': (context) => const ShopOrdersScreen(),
           '/promos': (context) => const ShopPromosScreen(),
           '/inventory': (context) => const ShopInventoryScreen(),

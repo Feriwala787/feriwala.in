@@ -10,16 +10,41 @@ class AddProductScreen extends StatefulWidget {
 
 class _AddProductScreenState extends State<AddProductScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _descController = TextEditingController();
-  final _brandController = TextEditingController();
-  final _mrpController = TextEditingController();
-  final _priceController = TextEditingController();
-  final _quantityController = TextEditingController(text: '10');
-  String _gender = 'unisex';
-  int? _categoryId;
-  List<dynamic> _categories = [];
+  final _nameCtrl = TextEditingController();
+  final _brandCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _mrpCtrl = TextEditingController();
+  final _sellingCtrl = TextEditingController();
+  final _qtyCtrl = TextEditingController(text: '0');
+  final _tagCtrl = TextEditingController();
+
   bool _saving = false;
+  List<dynamic> _categories = [];
+  int? _categoryId;
+
+  String _gender = 'unisex';
+  String? _size;
+  String? _color;
+  String? _material;
+  String? _productType;
+  String? _fit;
+  String? _pattern;
+  String? _sleeveType;
+  String? _neckType;
+  String? _occasion;
+  bool _isFeatured = false;
+  final List<String> _tags = [];
+
+  static const _genders = ['men', 'women', 'unisex', 'kids', 'boys', 'girls'];
+  static const _sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34', '36', '38', '40'];
+  static const _colors = ['Black', 'White', 'Blue', 'Navy', 'Grey', 'Red', 'Green', 'Yellow', 'Pink', 'Brown', 'Maroon'];
+  static const _materials = ['Cotton', 'Denim', 'Linen', 'Polyester', 'Wool', 'Rayon', 'Silk'];
+  static const _productTypes = ['Shirt', 'T-Shirt', 'Jeans', 'Trousers', 'Kurta', 'Dress', 'Jacket', 'Hoodie', 'Shorts'];
+  static const _fits = ['Regular', 'Slim', 'Relaxed', 'Oversized'];
+  static const _patterns = ['Solid', 'Striped', 'Checked', 'Printed'];
+  static const _sleeveTypes = ['Half Sleeve', 'Full Sleeve', 'Sleeveless'];
+  static const _neckTypes = ['Round Neck', 'Collar', 'V Neck', 'Mandarin'];
+  static const _occasions = ['Casual', 'Formal', 'Party', 'Sports', 'Festive'];
 
   @override
   void initState() {
@@ -30,124 +55,140 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Future<void> _loadCategories() async {
     try {
       final res = await ShopApiService().get('/products/categories/all');
-      setState(() => _categories = res['data'] ?? []);
-    } catch (e) {
-      debugPrint('Failed to load categories: $e');
-    }
+      final data = res['data'] as List? ?? [];
+      setState(() {
+        _categories = data;
+        if (_categories.isNotEmpty) {
+          _categoryId = (_categories.first['id'] as num?)?.toInt();
+        }
+      });
+    } catch (_) {}
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate() || _categoryId == null) return;
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_categoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a category')));
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       await ShopApiService().post('/products', body: {
-        'name': _nameController.text.trim(),
-        'description': _descController.text.trim(),
-        'brand': _brandController.text.trim(),
+        'name': _nameCtrl.text.trim(),
+        'brand': _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
+        'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         'categoryId': _categoryId,
-        'mrp': double.parse(_mrpController.text),
-        'sellingPrice': double.parse(_priceController.text),
+        'mrp': double.parse(_mrpCtrl.text.trim()),
+        'sellingPrice': double.parse(_sellingCtrl.text.trim()),
+        'quantity': int.tryParse(_qtyCtrl.text.trim()) ?? 0,
         'gender': _gender,
-        'quantity': int.parse(_quantityController.text),
+        'size': _size,
+        'color': _color,
+        'material': _material,
+        'tags': _tags,
+        'isFeatured': _isFeatured,
+        'attributes': {
+          if (_productType != null) 'productType': _productType,
+          if (_fit != null) 'fit': _fit,
+          if (_pattern != null) 'pattern': _pattern,
+          if (_sleeveType != null) 'sleeveType': _sleeveType,
+          if (_neckType != null) 'neckType': _neckType,
+          if (_occasion != null) 'occasion': _occasion,
+        },
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product added!'), backgroundColor: Colors.green));
-        Navigator.pop(context);
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product created')));
+      Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
+  Widget _dropdown(String label, String? value, List<String> items, ValueChanged<String?> onChanged) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(labelText: label),
+      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+      onChanged: onChanged,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Product')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Product Name *', border: OutlineInputBorder()),
-                validator: (v) => v != null && v.isNotEmpty ? null : 'Required',
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _descController,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _brandController,
-                decoration: const InputDecoration(labelText: 'Brand', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                initialValue: _categoryId,
-                decoration: const InputDecoration(labelText: 'Category *', border: OutlineInputBorder()),
-                items: _categories.map<DropdownMenuItem<int>>((c) => DropdownMenuItem(value: c['id'] as int, child: Text(c['name']))).toList(),
-                onChanged: (v) => setState(() => _categoryId = v),
-                validator: (v) => v != null ? null : 'Select a category',
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _gender,
-                decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
-                items: ['men', 'women', 'unisex', 'kids', 'boys', 'girls']
-                    .map((g) => DropdownMenuItem(value: g, child: Text(g.toUpperCase())))
-                    .toList(),
-                onChanged: (v) => setState(() => _gender = v!),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _mrpController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'MRP (₹) *', border: OutlineInputBorder()),
-                      validator: (v) => v != null && double.tryParse(v) != null ? null : 'Enter valid price',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _priceController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Selling Price (₹) *', border: OutlineInputBorder()),
-                      validator: (v) => v != null && double.tryParse(v) != null ? null : 'Enter valid price',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _quantityController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Initial Stock Quantity', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF47721),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('Add Product', style: TextStyle(fontSize: 16)),
+      appBar: AppBar(title: const Text('Create Product')),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextFormField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Name *'), validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null),
+            TextFormField(controller: _brandCtrl, decoration: const InputDecoration(labelText: 'Brand')),
+            TextFormField(controller: _descCtrl, decoration: const InputDecoration(labelText: 'Description'), maxLines: 3),
+            DropdownButtonFormField<int>(
+              value: _categoryId,
+              decoration: const InputDecoration(labelText: 'Category *'),
+              items: _categories
+                  .map((c) => DropdownMenuItem<int>(
+                        value: (c['id'] as num?)?.toInt(),
+                        child: Text(c['name']?.toString() ?? 'Category'),
+                      ))
+                  .toList(),
+              onChanged: (v) => setState(() => _categoryId = v),
+            ),
+            TextFormField(controller: _mrpCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'MRP *'), validator: (v) => (double.tryParse(v ?? '') == null) ? 'Invalid MRP' : null),
+            TextFormField(controller: _sellingCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Selling Price *'), validator: (v) => (double.tryParse(v ?? '') == null) ? 'Invalid price' : null),
+            TextFormField(controller: _qtyCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Opening stock')),
+            const SizedBox(height: 10),
+            _dropdown('Gender', _gender, _genders, (v) => setState(() => _gender = v ?? 'unisex')),
+            _dropdown('Size', _size, _sizes, (v) => setState(() => _size = v)),
+            _dropdown('Color', _color, _colors, (v) => setState(() => _color = v)),
+            _dropdown('Material', _material, _materials, (v) => setState(() => _material = v)),
+            _dropdown('Product Type', _productType, _productTypes, (v) => setState(() => _productType = v)),
+            _dropdown('Fit', _fit, _fits, (v) => setState(() => _fit = v)),
+            _dropdown('Pattern', _pattern, _patterns, (v) => setState(() => _pattern = v)),
+            _dropdown('Sleeve Type', _sleeveType, _sleeveTypes, (v) => setState(() => _sleeveType = v)),
+            _dropdown('Neck Type', _neckType, _neckTypes, (v) => setState(() => _neckType = v)),
+            _dropdown('Occasion', _occasion, _occasions, (v) => setState(() => _occasion = v)),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _isFeatured,
+              title: const Text('Featured product'),
+              onChanged: (v) => setState(() => _isFeatured = v),
+            ),
+            Row(
+              children: [
+                Expanded(child: TextField(controller: _tagCtrl, decoration: const InputDecoration(labelText: 'Add tag'))),
+                IconButton(
+                  onPressed: () {
+                    final tag = _tagCtrl.text.trim();
+                    if (tag.isEmpty) return;
+                    setState(() => _tags.add(tag));
+                    _tagCtrl.clear();
+                  },
+                  icon: const Icon(Icons.add_circle_outline),
                 ),
+              ],
+            ),
+            if (_tags.isNotEmpty)
+              Wrap(
+                spacing: 6,
+                children: _tags.map((t) => Chip(label: Text(t), onDeleted: () => setState(() => _tags.remove(t)))).toList(),
               ),
-            ],
-          ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _submit,
+                child: _saving ? const CircularProgressIndicator() : const Text('Create Product'),
+              ),
+            ),
+          ],
         ),
       ),
     );
