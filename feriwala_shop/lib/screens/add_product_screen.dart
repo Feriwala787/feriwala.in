@@ -45,6 +45,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
   static const _sleeveTypes = ['Half Sleeve', 'Full Sleeve', 'Sleeveless'];
   static const _neckTypes = ['Round Neck', 'Collar', 'V Neck', 'Mandarin'];
   static const _occasions = ['Casual', 'Formal', 'Party', 'Sports', 'Festive'];
+  static const _presetTags = [
+    'summer collection', 'party wear', 'casual wear', 'shirts', 'jeans', 'denims',
+    'mens', 'womens', 'footwear', 'sportswear', 'ethnic', 'winter collection',
+    'sneakers', 'formal shoes', 'heels', 'sandals',
+  ];
 
   @override
   void initState() {
@@ -180,6 +185,28 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 spacing: 6,
                 children: _tags.map((t) => Chip(label: Text(t), onDeleted: () => setState(() => _tags.remove(t)))).toList(),
               ),
+            const SizedBox(height: 10),
+            const Text('Quick tags (multi-select)', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _presetTags
+                  .map((t) => FilterChip(
+                        label: Text(t),
+                        selected: _tags.contains(t),
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _tags.add(t);
+                            } else {
+                              _tags.remove(t);
+                            }
+                          });
+                        },
+                      ))
+                  .toList(),
+            ),
             const SizedBox(height: 16),
             SizedBox(
               height: 48,
