@@ -2,8 +2,26 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
+const net = require('node:net');
 
 const SERVER_START_TIMEOUT_MS = 10000;
+
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = address && typeof address === 'object' ? address.port : null;
+      server.close(err => {
+        if (err) return reject(err);
+        if (!port) return reject(new Error('Unable to resolve a free port'));
+        resolve(port);
+      });
+    });
+  });
+}
 
 async function waitForHealth(baseUrl, timeoutMs) {
   const startedAt = Date.now();
@@ -20,7 +38,7 @@ async function waitForHealth(baseUrl, timeoutMs) {
 }
 
 test('health endpoints respond with expected status shape when DB is unavailable', async () => {
-  const port = 3310;
+  const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
 
   const server = spawn(process.execPath, ['src/server.js'], {
