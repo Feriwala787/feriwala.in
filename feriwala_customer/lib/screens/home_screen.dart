@@ -265,35 +265,68 @@ class _HomeScreenState extends State<HomeScreen> {
         .toList();
   }
 
-  bool _matchesSection(Map<String, dynamic> product, String section) {
+  bool _matchesSection(Map<String, dynamic> product, List<String> keywords) {
     final text = '${product['name'] ?? ''} ${product['description'] ?? ''} ${(product['category']?['name'] ?? '')}'
         .toLowerCase();
     final tags = (product['tags'] as List? ?? []).map((e) => e.toString().toLowerCase()).join(' ');
     final content = '$text $tags';
-    switch (section) {
-      case 'summer':
-        return content.contains('summer');
-      case 'party':
-        return content.contains('party');
-      case 'casual':
-        return content.contains('casual');
-      case 'shirts':
-        return content.contains('shirt');
-      case 'jeans':
-        return content.contains('jeans') || content.contains('denim');
-      case 'footwear':
-        return content.contains('footwear') || content.contains('shoe') || content.contains('sneaker');
-      default:
-        return false;
+    for (final k in keywords) {
+      if (content.contains(k.toLowerCase())) return true;
     }
+    return false;
   }
 
-  List<Map<String, dynamic>> _sectionProducts(String sectionKey) {
+  List<Map<String, dynamic>> _sectionProducts(List<String> keywords) {
     final filtered = _genderFilteredProducts();
-    final matched = filtered.where((p) => _matchesSection(p, sectionKey)).toList();
+    final matched = filtered.where((p) => _matchesSection(p, keywords)).toList();
     if (matched.length >= 5) return matched;
     final extra = filtered.where((p) => !matched.contains(p)).take(5 - matched.length);
     return [...matched, ...extra].take(12).toList();
+  }
+
+  List<String> _categoriesForGender() {
+    switch (_selectedGender) {
+      case 'women':
+        return ['Dresses', 'Tops', 'Kurtas', 'Sarees', 'Jeans', 'Leggings', 'Footwear', 'Heels', 'Ethnic', 'Nightwear', 'Activewear', 'Formals'];
+      case 'kids':
+        return ['T-Shirts', 'Shirts', 'Frocks', 'Shorts', 'Jeans', 'Track Pants', 'Footwear', 'School Wear', 'Party Wear', 'Winter Wear', 'Rain Wear', 'Ethnic'];
+      default:
+        return ['Shirts', 'Denim', 'Footwear', 'Kurta', 'Formals', 'T-Shirts', 'Underwear', 'Lowers', 'Pajama', 'Casual Pants', 'Activewear', 'Ethnic'];
+    }
+  }
+
+  List<Map<String, dynamic>> _tagRowsForGender() {
+    final now = DateTime.now();
+    final isSummer = now.month >= 3 && now.month <= 9;
+    final seasonal = isSummer
+        ? {'title': 'Summer Collection', 'keywords': ['summer', 'cotton', 'lightweight']}
+        : {'title': 'Winter Collection', 'keywords': ['winter', 'hoodie', 'wool', 'jacket']};
+
+    if (_selectedGender == 'women') {
+      return [
+        {'title': 'Party Wear', 'keywords': ['party', 'gown', 'dress']},
+        {'title': 'Casual Wear', 'keywords': ['casual']},
+        {'title': 'Gym Wear', 'keywords': ['gym', 'active', 'sports']},
+        seasonal,
+        {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
+      ];
+    }
+    if (_selectedGender == 'kids') {
+      return [
+        {'title': 'Party Wear', 'keywords': ['party']},
+        {'title': 'Casual Wear', 'keywords': ['casual']},
+        {'title': 'Sports Wear', 'keywords': ['sports', 'active', 'gym']},
+        seasonal,
+        {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
+      ];
+    }
+    return [
+      {'title': 'Party Wear', 'keywords': ['party']},
+      {'title': 'Casual Wear', 'keywords': ['casual']},
+      {'title': 'Gym Wear', 'keywords': ['gym', 'active', 'sports']},
+      seasonal,
+      {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
+    ];
   }
 
   @override
@@ -343,37 +376,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search shirts, jeans, dresses, socks...',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.arrow_forward),
-                            onPressed: _loadBrowseProducts,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        onChanged: _updateSearchSuggestions,
-                        onSubmitted: (_) => _loadBrowseProducts(),
-                      ),
-                    ),
-                    if (_searchSuggestions.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Wrap(
-                          spacing: 8,
-                          children: _searchSuggestions.map((s) => ActionChip(label: Text(s), onPressed: () { _searchController.text = s; _loadBrowseProducts(); })).toList(),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Container(
@@ -437,6 +439,37 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 8),
                     Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search shirts, jeans, dresses, socks...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.arrow_forward),
+                            onPressed: _loadBrowseProducts,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: _updateSearchSuggestions,
+                        onSubmitted: (_) => _loadBrowseProducts(),
+                      ),
+                    ),
+                    if (_searchSuggestions.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Wrap(
+                          spacing: 8,
+                          children: _searchSuggestions.map((s) => ActionChip(label: Text(s), onPressed: () { _searchController.text = s; _loadBrowseProducts(); })).toList(),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
@@ -445,6 +478,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               segments: const [
                                 ButtonSegment(value: 'men', label: Text("Men's Collection")),
                                 ButtonSegment(value: 'women', label: Text("Women's Collection")),
+                                ButtonSegment(value: 'kids', label: Text("Kids Collection")),
                               ],
                               selected: {_selectedGender},
                               onSelectionChanged: (set) {
@@ -475,19 +509,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        children: categories.map((c) => Padding(
+                        children: _categoriesForGender().map((name) => Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: ChoiceChip(
-                            label: Text(c.name),
-                            selected: _selectedCategoryId == c.id,
+                            label: Text(name),
+                            selected: _selectedCategoryName == name,
                             onSelected: (_) {
                               setState(() {
-                                if (_selectedCategoryId == c.id) {
+                                if (_selectedCategoryName == name) {
                                   _selectedCategoryId = null;
                                   _selectedCategoryName = 'All';
                                 } else {
-                                  _selectedCategoryId = c.id;
-                                  _selectedCategoryName = c.name;
+                                  _selectedCategoryId = categories.firstWhere(
+                                    (c) => c.name.toLowerCase() == name.toLowerCase(),
+                                    orElse: () => const _CategoryTileData('', Icons.checkroom),
+                                  ).id;
+                                  _selectedCategoryName = name;
                                 }
                               });
                               _loadBrowseProducts();
@@ -496,12 +533,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         )).toList(),
                       ),
                     ),
-                    _SectionRow(title: 'Summer Collection', products: _sectionProducts('summer')),
-                    _SectionRow(title: 'Party Wear', products: _sectionProducts('party')),
-                    _SectionRow(title: 'Casual Wear', products: _sectionProducts('casual')),
-                    _SectionRow(title: 'Shirts', products: _sectionProducts('shirts')),
-                    _SectionRow(title: 'Jeans / Denims', products: _sectionProducts('jeans')),
-                    _SectionRow(title: 'Footwear', products: _sectionProducts('footwear')),
+                    ..._tagRowsForGender().map((row) => _SectionRow(
+                          title: row['title'] as String,
+                          products: _sectionProducts((row['keywords'] as List).map((e) => e.toString()).toList()),
+                        )),
                     if (_recentProducts.isNotEmpty) ...[
                       const Padding(
                         padding: EdgeInsets.fromLTRB(16, 12, 16, 8),

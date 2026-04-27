@@ -48,7 +48,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   static const _presetTags = [
     'summer collection', 'party wear', 'casual wear', 'shirts', 'jeans', 'denims',
     'mens', 'womens', 'footwear', 'sportswear', 'ethnic', 'winter collection',
-    'sneakers', 'formal shoes', 'heels', 'sandals',
+    'sneakers', 'formal shoes', 'heels', 'sandals', 'kids collection', 'gym wear',
+    'rain wear', 'kurta', 'formals', 't-shirts', 'underwear', 'lowers', 'pajama',
   ];
 
   @override
