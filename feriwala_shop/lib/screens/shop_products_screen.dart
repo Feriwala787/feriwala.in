@@ -96,14 +96,6 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_box_outlined),
-            tooltip: 'List New Product',
-            onPressed: () async {
-              final created = await Navigator.pushNamed(context, '/products/add');
-              if (created == true) _load();
-            },
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             onSelected: (v) { setState(() => _sortBy = v); _applyFilter(); },
@@ -180,14 +172,17 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                                   style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
                               if (_all.isEmpty) ...[
                                 const SizedBox(height: 12),
-                                ElevatedButton.icon(
-                                  onPressed: () async {
-                                    final created = await Navigator.pushNamed(context, '/products/add');
-                                    if (created == true) _load();
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('List First Product'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF47721), foregroundColor: Colors.white),
+                                Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Text(
+                                    'New product listing is available on the web app only. Please use the Product Listing Portal.',
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ],
                             ],
@@ -210,15 +205,6 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final created = await Navigator.pushNamed(context, '/products/add');
-          if (created == true) _load();
-        },
-        backgroundColor: const Color(0xFFF47721),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('List Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
     );
   }
 
