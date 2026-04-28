@@ -26,6 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
   int? _selectedCategoryId;
   String _selectedCategoryName = 'All';
+  String _selectedGender = 'men';
+  bool _categoriesExpanded = false;
   Map<String, dynamic>? _selectedWarehouse;
   List<Map<String, dynamic>> _recentProducts = [];
   List<String> _searchSuggestions = [];
@@ -149,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               return ListTile(
                 title: Text(shop['name'] ?? 'Warehouse'),
-                subtitle: Text('${shop['city'] ?? ''} • ${(distance ?? 0).toStringAsFixed(1)} km'),
+                subtitle: Text('${shop['city'] ?? ''} - ${(distance ?? 0).toStringAsFixed(1)} km'),
                 trailing: selected ? const Icon(Icons.check_circle, color: Color(0xFFF47721)) : null,
                 onTap: () {
                   setState(() => _selectedWarehouse = shop);
@@ -233,6 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _productLoading = true);
     try {
       final params = <String, String>{'limit': '20'};
+      params['gender'] = _selectedGender;
       if (_selectedCategoryId != null) params['categoryId'] = '$_selectedCategoryId';
       if (_searchController.text.trim().isNotEmpty) {
         final raw = _searchController.text.trim();
@@ -252,6 +255,78 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       if (mounted) setState(() => _productLoading = false);
     }
+  }
+
+  List<Map<String, dynamic>> _genderFilteredProducts() {
+    return _browseProducts
+        .whereType<Map>()
+        .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
+        .where((p) => (p['gender'] ?? '').toString().toLowerCase() == _selectedGender)
+        .toList();
+  }
+
+  bool _matchesSection(Map<String, dynamic> product, List<String> keywords) {
+    final text = '${product['name'] ?? ''} ${product['description'] ?? ''} ${(product['category']?['name'] ?? '')}'
+        .toLowerCase();
+    final tags = (product['tags'] as List? ?? []).map((e) => e.toString().toLowerCase()).join(' ');
+    final content = '$text $tags';
+    for (final k in keywords) {
+      if (content.contains(k.toLowerCase())) return true;
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> _sectionProducts(List<String> keywords) {
+    final filtered = _genderFilteredProducts();
+    final matched = filtered.where((p) => _matchesSection(p, keywords)).toList();
+    if (matched.length >= 5) return matched;
+    final extra = filtered.where((p) => !matched.contains(p)).take(5 - matched.length);
+    return [...matched, ...extra].take(12).toList();
+  }
+
+  List<String> _categoriesForGender() {
+    switch (_selectedGender) {
+      case 'women':
+        return ['Dresses', 'Tops', 'Kurtas', 'Sarees', 'Jeans', 'Leggings', 'Footwear', 'Heels', 'Ethnic', 'Nightwear', 'Activewear', 'Formals'];
+      case 'kids':
+        return ['T-Shirts', 'Shirts', 'Frocks', 'Shorts', 'Jeans', 'Track Pants', 'Footwear', 'School Wear', 'Party Wear', 'Winter Wear', 'Rain Wear', 'Ethnic'];
+      default:
+        return ['Shirts', 'Denim', 'Footwear', 'Kurta', 'Formals', 'T-Shirts', 'Underwear', 'Lowers', 'Pajama', 'Casual Pants', 'Activewear', 'Ethnic'];
+    }
+  }
+
+  List<Map<String, dynamic>> _tagRowsForGender() {
+    final now = DateTime.now();
+    final isSummer = now.month >= 3 && now.month <= 9;
+    final seasonal = isSummer
+        ? {'title': 'Summer Collection', 'keywords': ['summer', 'cotton', 'lightweight']}
+        : {'title': 'Winter Collection', 'keywords': ['winter', 'hoodie', 'wool', 'jacket']};
+
+    if (_selectedGender == 'women') {
+      return [
+        {'title': 'Party Wear', 'keywords': ['party', 'gown', 'dress']},
+        {'title': 'Casual Wear', 'keywords': ['casual']},
+        {'title': 'Gym Wear', 'keywords': ['gym', 'active', 'sports']},
+        seasonal,
+        {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
+      ];
+    }
+    if (_selectedGender == 'kids') {
+      return [
+        {'title': 'Party Wear', 'keywords': ['party']},
+        {'title': 'Casual Wear', 'keywords': ['casual']},
+        {'title': 'Sports Wear', 'keywords': ['sports', 'active', 'gym']},
+        seasonal,
+        {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
+      ];
+    }
+    return [
+      {'title': 'Party Wear', 'keywords': ['party']},
+      {'title': 'Casual Wear', 'keywords': ['casual']},
+      {'title': 'Gym Wear', 'keywords': ['gym', 'active', 'sports']},
+      seasonal,
+      {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
+    ];
   }
 
   @override
@@ -302,6 +377,68 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8F9FB),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.my_location, color: Color(0xFFF47721)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _currentPosition == null
+                                        ? 'Location not available'
+                                        : 'Lat ${_currentPosition!.latitude.toStringAsFixed(4)}, Lng ${_currentPosition!.longitude.toStringAsFixed(4)}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.refresh),
+                                  onPressed: _requestPermissionsAndLoadNearbyWarehouses,
+                                  tooltip: 'Refresh GPS',
+                                ),
+                              ],
+                            ),
+                            if (_warehouseLoading)
+                              const Text('Fetching nearby warehouses...')
+                            else if (_nearbyWarehouses.isEmpty)
+                              const Text('No nearby warehouses found.'),
+                            if (_nearbyWarehouses.isNotEmpty)
+                              DropdownButtonFormField<int>(
+                                initialValue: (_selectedWarehouse?['id'] as num?)?.toInt(),
+                                decoration: const InputDecoration(labelText: 'Selected Warehouse'),
+                                items: _nearbyWarehouses
+                                    .map((w) => DropdownMenuItem<int>(
+                                          value: (w['id'] as num?)?.toInt(),
+                                          child: Text('${w['name']} - ${(_distanceKm(w) ?? 0).toStringAsFixed(1)} km'),
+                                        ))
+                                    .toList(),
+                                onChanged: (id) {
+                                  final found = _nearbyWarehouses.firstWhere(
+                                    (w) => (w['id'] as num?)?.toInt() == id,
+                                    orElse: () => null,
+                                  );
+                                  if (found != null) {
+                                    setState(() => _selectedWarehouse = found as Map<String, dynamic>);
+                                    _loadBrowseProducts();
+                                  }
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
                       padding: const EdgeInsets.all(16),
                       child: TextField(
                         controller: _searchController,
@@ -334,69 +471,72 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8F9FB),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.location_on, color: Color(0xFFF47721)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _warehouseLoading
-                                  ? const Text('Fetching nearby warehouses...')
-                                  : Text(
-                                      _selectedWarehouse == null
-                                          ? 'Enable location to find nearest warehouse (within 10 km).'
-                                          : '${_selectedWarehouse!['name']} • ${(_distanceKm(_selectedWarehouse) ?? 0).toStringAsFixed(1)} km',
-                                      maxLines: 2,
-                                    ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: SegmentedButton<String>(
+                              segments: const [
+                                ButtonSegment(value: 'men', label: Text("Men's Collection")),
+                                ButtonSegment(value: 'women', label: Text("Women's Collection")),
+                                ButtonSegment(value: 'kids', label: Text("Kids Collection")),
+                              ],
+                              selected: {_selectedGender},
+                              onSelectionChanged: (set) {
+                                setState(() => _selectedGender = set.first);
+                                _loadBrowseProducts();
+                              },
                             ),
-                            TextButton(onPressed: _chooseWarehouse, child: const Text('Change')),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('Shop by Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(height: 8),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 5,
-                        childAspectRatio: 0.66,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          const Text('Categories', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Spacer(),
+                          IconButton(
+                            icon: Icon(_categoriesExpanded ? Icons.expand_less : Icons.expand_more),
+                            onPressed: () => setState(() => _categoriesExpanded = !_categoriesExpanded),
+                          ),
+                        ],
                       ),
-                      itemCount: categories.length,
-                      itemBuilder: (context, index) {
-                        final category = categories[index];
-                        return _CategoryTile(
-                          category: category,
-                          selected: _selectedCategoryId == category.id,
-                          onTap: () {
-                            setState(() {
-                              if (_selectedCategoryId == category.id) {
-                                _selectedCategoryId = null;
-                                _selectedCategoryName = 'All';
-                              } else {
-                                _selectedCategoryId = category.id;
-                                _selectedCategoryName = category.name;
-                              }
-                            });
-                            _loadBrowseProducts();
-                          },
-                        );
-                      },
                     ),
+                    SizedBox(
+                      height: _categoriesExpanded ? 96 : 48,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        children: _categoriesForGender().map((name) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(name),
+                            selected: _selectedCategoryName == name,
+                            onSelected: (_) {
+                              setState(() {
+                                if (_selectedCategoryName == name) {
+                                  _selectedCategoryId = null;
+                                  _selectedCategoryName = 'All';
+                                } else {
+                                  _selectedCategoryId = categories.firstWhere(
+                                    (c) => c.name.toLowerCase() == name.toLowerCase(),
+                                    orElse: () => const _CategoryTileData('', Icons.checkroom),
+                                  ).id;
+                                  _selectedCategoryName = name;
+                                }
+                              });
+                              _loadBrowseProducts();
+                            },
+                          ),
+                        )).toList(),
+                      ),
+                    ),
+                    ..._tagRowsForGender().map((row) => _SectionRow(
+                          title: row['title'] as String,
+                          products: _sectionProducts((row['keywords'] as List).map((e) => e.toString()).toList()),
+                        )),
                     if (_recentProducts.isNotEmpty) ...[
                       const Padding(
                         padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -447,7 +587,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Text(
                         _selectedCategoryId == null
                             ? 'Browse Products'
-                            : 'Browse Products • $_selectedCategoryName',
+                            : 'Browse Products - $_selectedCategoryName',
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -509,6 +649,35 @@ class _CategoryTileData {
   final IconData icon;
   final int? id;
   const _CategoryTileData(this.name, this.icon, {this.id});
+}
+
+class _SectionRow extends StatelessWidget {
+  final String title;
+  final List<Map<String, dynamic>> products;
+  const _SectionRow({required this.title, required this.products});
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+          child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+        SizedBox(
+          height: 220,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: products.length,
+            itemBuilder: (context, index) => _ProductCard(product: products[index]),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _CategoryTile extends StatelessWidget {

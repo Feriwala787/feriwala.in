@@ -75,7 +75,7 @@ class _ShopReturnsScreenState extends State<ShopReturnsScreen> {
                     leading: const Icon(Icons.person_pin_circle),
                     title: Text(agent['name'] ?? 'Delivery Agent'),
                     subtitle: Text(
-                      '${agent['phone'] ?? ''} • ${(agent['distanceKm'] ?? '-')} km • ${agent['vehicleType'] ?? 'bike'}',
+                      '${agent['phone'] ?? ''} - ${(agent['distanceKm'] ?? '-')} km - ${agent['vehicleType'] ?? 'bike'}',
                     ),
                     onTap: () => Navigator.pop(ctx, agent['agentId']?.toString() ?? ''),
                   )),
@@ -181,7 +181,7 @@ class _ShopReturnsScreenState extends State<ShopReturnsScreen> {
                                   });
                                 }
                               : null,
-                          title: Text('Return #$id • Order #${item['orderId']}'),
+                          title: Text('Return #$id - Order #${item['orderId']}'),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

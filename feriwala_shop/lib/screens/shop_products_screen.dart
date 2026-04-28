@@ -66,7 +66,19 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
     final shopId = context.watch<ShopAuthProvider>().shopId;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Products')),
+      appBar: AppBar(
+        title: const Text('Products'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_box_outlined),
+            tooltip: 'Create Product',
+            onPressed: () async {
+              final created = await Navigator.pushNamed(context, '/products/add');
+              if (created == true) _loadProducts();
+            },
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -103,7 +115,7 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                                 const Text('No products in this warehouse'),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Product creation is managed in web admin portal.',
+                                  'Tap + to create product in a separate page.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(color: Colors.grey.shade700),
                                 ),

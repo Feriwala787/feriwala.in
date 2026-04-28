@@ -414,7 +414,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            '#${r['id']} • ${(r['returnType'] ?? 'return').toString().toUpperCase()} • ${(r['status'] ?? '').toString().replaceAll('_', ' ').toUpperCase()}',
+                                            '#${r['id']} - ${(r['returnType'] ?? 'return').toString().toUpperCase()} - ${(r['status'] ?? '').toString().replaceAll('_', ' ').toUpperCase()}',
                                             style: const TextStyle(fontWeight: FontWeight.w600),
                                           ),
                                           Text(r['reason'] ?? '', style: const TextStyle(color: Colors.grey)),

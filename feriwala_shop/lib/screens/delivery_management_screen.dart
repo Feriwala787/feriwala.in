@@ -54,7 +54,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
               ),
               ..._nearbyAgents.map((a) => ListTile(
                     title: Text(a['name'] ?? 'Delivery Agent'),
-                    subtitle: Text('${a['phone'] ?? ''} • ${a['distanceKm'] ?? '-'} km • load ${a['activeTaskCount'] ?? 0}'),
+                    subtitle: Text('${a['phone'] ?? ''} - ${a['distanceKm'] ?? '-'} km - load ${a['activeTaskCount'] ?? 0}'),
                     onTap: () => Navigator.pop(ctx, a['agentId']?.toString() ?? ''),
                   )),
             ],

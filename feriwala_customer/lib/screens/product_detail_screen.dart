@@ -183,7 +183,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   children: [
                                     const Icon(Icons.delivery_dining, color: Color(0xFFF47721)),
                                     const SizedBox(width: 8),
-                                    Text('Delivery in ${_product!['estimatedDeliveryMinutes'] ?? 30} mins • Fee INR ${_shop!['deliveryFee'] ?? 0}'),
+                                    Text('Delivery in ${_product!['estimatedDeliveryMinutes'] ?? 30} mins - Fee INR ${_shop!['deliveryFee'] ?? 0}'),
                                   ],
                                 ),
                               ),
