@@ -84,6 +84,7 @@ const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString()}`;
 
 export default function ShopProducts() {
   const { user } = useAuth();
+  const isShopOwnerPortal = Boolean(user?.shopId);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState(initialForm);
@@ -271,6 +272,10 @@ export default function ShopProducts() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!isShopOwnerPortal) {
+      toast.error('Product creation is allowed only for shop owners in the shop web portal.');
+      return;
+    }
     if (duplicateMatches.length > 0) {
       toast.error('Possible duplicate listing found. Please review existing products first.');
       return;
@@ -467,7 +472,7 @@ export default function ShopProducts() {
       <div>
         <h2 className="text-2xl font-bold text-gray-800">Product Listing Portal</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Shop admins can list new products only here in the web portal. Mobile app supports viewing/managing listed products.
+          Product creation is available only for shop owners from the web portal. Mobile app is for viewing/managing listed products.
         </p>
       </div>
 
@@ -494,13 +499,18 @@ export default function ShopProducts() {
         <div className="xl:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-4 gap-3">
             <h3 className="text-lg font-semibold text-gray-800">{editingId ? 'Edit product' : 'Create product'}</h3>
-            {editingId && (
+            {editingId && isShopOwnerPortal && (
               <button onClick={resetForm} className="text-sm text-gray-500 hover:text-gray-800">
                 Clear form
               </button>
             )}
           </div>
 
+          {!isShopOwnerPortal ? (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+              This view is read-only for admin users. Product creation is allowed only from the shop owner web portal login.
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
               <div className="flex items-center justify-between">
@@ -739,6 +749,7 @@ export default function ShopProducts() {
               {saving ? 'Saving...' : editingId ? 'Update product' : 'Create product'}
             </button>
           </form>
+          )}
         </div>
 
         <div className="xl:col-span-3 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
@@ -820,9 +831,11 @@ export default function ShopProducts() {
                       <p className="text-lg font-bold text-gray-800">{formatCurrency(product.sellingPrice)}</p>
                       <p className="text-sm text-gray-500 line-through">{formatCurrency(product.mrp)}</p>
                       <div className="mt-3 flex flex-wrap gap-2 md:justify-end">
-                        <button onClick={() => startEdit(product)} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm">
-                          Edit
-                        </button>
+                        {isShopOwnerPortal && (
+                          <button onClick={() => startEdit(product)} className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm">
+                            Edit
+                          </button>
+                        )}
                         <button onClick={() => toggleStatus(product)} className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm">
                           {product.isActive ? 'Hide' : 'Activate'}
                         </button>
