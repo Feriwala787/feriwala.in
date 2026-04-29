@@ -20,6 +20,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _loading = true;
   int _quantity = 1;
   String? _selectedSize;
+  String? _selectedColor;
 
   Map<String, dynamic> get _attributes {
     final raw = _product?['attributes'];
@@ -43,10 +44,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return const {};
   }
 
+  Map<String, dynamic> get _variantStock {
+    final raw = _attributes['variantStock'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((key, value) => MapEntry(key.toString(), value));
+    return const {};
+  }
+
+  List<String> get _availableColors {
+    final colorString = (_product?['color'] ?? '').toString();
+    if (colorString.isEmpty) return [];
+    return colorString.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
   int _stockForSize(String size) {
     final value = _sizeInventories[size];
     if (value == null) return (_product?['inventory'] as List?)?.isNotEmpty == true ? ((_product!['inventory'][0]['quantity'] ?? 0) as num).toInt() : 0;
     return int.tryParse(value.toString()) ?? 0;
+  }
+
+  int _stockForSelection() {
+    if (_selectedSize != null && _selectedColor != null && _variantStock.isNotEmpty) {
+      final key = '${_selectedSize!}__${_selectedColor!}';
+      return int.tryParse(_variantStock[key].toString()) ?? 0;
+    }
+    if (_selectedSize != null) return _stockForSize(_selectedSize!);
+    return (_product?['inventory'] as List?)?.isNotEmpty == true ? ((_product!['inventory'][0]['quantity'] ?? 0) as num).toInt() : 0;
   }
 
   @override
@@ -84,6 +107,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _shop = shop;
         final sizes = _availableSizes;
         if (sizes.isNotEmpty) _selectedSize = sizes.first;
+        final colors = _availableColors;
+        if (colors.isNotEmpty) _selectedColor = colors.first;
         _loading = false;
       });
       _saveRecentlyViewed();
@@ -94,8 +119,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _addToCart() {
     if (_product == null) return;
-    if (_availableSizes.isNotEmpty && (_selectedSize == null || _stockForSize(_selectedSize!) <= 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selected size is out of stock'), backgroundColor: Colors.orange));
+    if (_availableSizes.isNotEmpty && (_selectedSize == null || _stockForSelection() <= 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selected variant is out of stock'), backgroundColor: Colors.orange));
+      return;
+    }
+    if (_availableColors.isNotEmpty && _selectedColor == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select color'), backgroundColor: Colors.orange));
       return;
     }
 
@@ -107,7 +136,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         price: double.parse(_product!['sellingPrice'].toString()),
         image: (_product!['images'] as List?)?.isNotEmpty == true ? _product!['images'][0] : null,
         size: _selectedSize ?? _product!['size'],
-        color: _product!['color'],
+        color: _selectedColor ?? _product!['color'],
         quantity: _quantity,
       ),
       _product!['shopId'],
@@ -120,7 +149,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
-    final selectedStock = _selectedSize != null ? _stockForSize(_selectedSize!) : null;
+    final selectedStock = _stockForSelection();
 
     return Scaffold(
       appBar: AppBar(
@@ -205,14 +234,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                               const SizedBox(height: 8),
                             ],
-                            if (selectedStock != null)
-                              Text(selectedStock > 0 ? 'In Stock: $selectedStock' : 'Out of Stock',
-                                  style: TextStyle(color: selectedStock > 0 ? Colors.green : Colors.red)),
+                            if (_availableColors.isNotEmpty) ...[
+                              const Text('Select Color', style: TextStyle(fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                children: _availableColors.map((color) {
+                                  return ChoiceChip(
+                                    label: Text(color),
+                                    selected: _selectedColor == color,
+                                    onSelected: (_) => setState(() => _selectedColor = color),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            Text(selectedStock > 0 ? 'In Stock: $selectedStock' : 'Out of Stock',
+                                style: TextStyle(color: selectedStock > 0 ? Colors.green : Colors.red)),
                             const SizedBox(height: 16),
+                            if ((_product!['shortDescription'] ?? '').toString().isNotEmpty) ...[
+                              Text(_product!['shortDescription'], style: const TextStyle(fontSize: 14, color: Colors.black87)),
+                              const SizedBox(height: 12),
+                            ],
                             if (_product!['description'] != null) ...[
                               const Text('Description', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 8),
                               Text(_product!['description'], style: const TextStyle(color: Colors.grey, height: 1.5)),
+                            ],
+                            if ((_product!['highlights'] as List?)?.isNotEmpty == true) ...[
+                              const SizedBox(height: 12),
+                              const Text('Highlights', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              ...( (_product!['highlights'] as List).map((h) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text('• ${h.toString()}'),
+                              )) ),
                             ],
                             const SizedBox(height: 24),
                             Row(
@@ -265,13 +321,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: SizedBox(
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: (selectedStock != null && selectedStock <= 0) ? null : _addToCart,
+                        onPressed: selectedStock <= 0 ? null : _addToCart,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFF47721),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: Text((selectedStock != null && selectedStock <= 0) ? 'Out of Stock' : 'Add to Cart',
+                        child: Text(selectedStock <= 0 ? 'Out of Stock' : 'Add to Cart',
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
