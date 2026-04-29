@@ -99,20 +99,24 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
+const RATE_LIMIT_DISABLED = process.env.DISABLE_RATE_LIMIT === 'true';
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => RATE_LIMIT_DISABLED,
 });
 
 // Tighter limiter for auth endpoints to prevent brute-force
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '20', 10),
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
+  skip: () => RATE_LIMIT_DISABLED,
 });
 
 app.use('/api/', generalLimiter);

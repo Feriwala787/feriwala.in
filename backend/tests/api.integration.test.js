@@ -7,14 +7,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const https = require('https');
 
 const BASE = process.env.API_BASE_URL || 'https://api.feriwala.in/api';
 const TIMEOUT = 15000;
-const tlsAgent = new https.Agent({ rejectUnauthorized: false });
+const DELAY_MS = parseInt(process.env.TEST_DELAY_MS || '50', 10);
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ─── HTTP helper ────────────────────────────────────────────────────────────
 async function req(method, path, body, token) {
+  await sleep(DELAY_MS); // respect rate limiter
   const url = new URL(BASE + path);
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;

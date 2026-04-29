@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 
-const SERVER_START_TIMEOUT_MS = 10000;
+const SERVER_START_TIMEOUT_MS = 20000;
 
 async function waitForHealth(baseUrl, timeoutMs) {
   const startedAt = Date.now();

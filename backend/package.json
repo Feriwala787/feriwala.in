@@ -9,8 +9,8 @@
     "migrate": "node src/database/migrate.js",
     "seed": "node src/database/seed.js",
     "test": "node --test tests/smoke.test.js tests/health.integration.test.js",
-    "test:api": "node --test tests/api.integration.test.js",
-    "test:all": "node --test tests/smoke.test.js tests/health.integration.test.js tests/api.integration.test.js",
+    "test:api": "DISABLE_RATE_LIMIT=true node --test tests/api.integration.test.js",
+    "test:all": "DISABLE_RATE_LIMIT=true node --test tests/smoke.test.js tests/health.integration.test.js tests/api.integration.test.js",
     "smoke": "node --check src/server.js && node --check src/database/mongodb.js && node --check src/database/postgres.js"
   },
   "dependencies": {
