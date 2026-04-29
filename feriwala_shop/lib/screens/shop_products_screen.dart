@@ -96,14 +96,6 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_box_outlined),
-            tooltip: 'List New Product',
-            onPressed: () async {
-              final created = await Navigator.pushNamed(context, '/products/add');
-              if (created == true) _load();
-            },
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             onSelected: (v) { setState(() => _sortBy = v); _applyFilter(); },
@@ -134,6 +126,19 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                       const SizedBox(width: 8),
                       _statChip('$outOfStock', 'Out of Stock', Colors.red.shade300),
                     ],
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Product listing is available only on the web Product Listing Portal. This app is for viewing and managing listed products.',
+                    style: TextStyle(fontSize: 12),
                   ),
                 ),
 
@@ -180,14 +185,17 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                                   style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
                               if (_all.isEmpty) ...[
                                 const SizedBox(height: 12),
-                                ElevatedButton.icon(
-                                  onPressed: () async {
-                                    final created = await Navigator.pushNamed(context, '/products/add');
-                                    if (created == true) _load();
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('List First Product'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF47721), foregroundColor: Colors.white),
+                                Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Text(
+                                    'New product listing is available on the web app only. Please use the Product Listing Portal.',
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ],
                             ],
@@ -210,15 +218,6 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final created = await Navigator.pushNamed(context, '/products/add');
-          if (created == true) _load();
-        },
-        backgroundColor: const Color(0xFFF47721),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('List Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
     );
   }
 
