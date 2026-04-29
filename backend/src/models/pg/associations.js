@@ -8,6 +8,7 @@ const PromoCode = require('./PromoCode');
 const Invoice = require('./Invoice');
 const DeliveryTask = require('./DeliveryTask');
 const ReturnRequest = require('./ReturnRequest');
+const Review = require('./Review');
 
 // Shop -> Products
 Shop.hasMany(Product, { foreignKey: 'shopId', as: 'products' });
@@ -59,8 +60,14 @@ ReturnRequest.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
 OrderItem.hasMany(ReturnRequest, { foreignKey: 'orderItemId', as: 'returnRequests' });
 ReturnRequest.belongsTo(OrderItem, { foreignKey: 'orderItemId', as: 'orderItem' });
 
+// Product -> Reviews
+Product.hasMany(Review, { foreignKey: 'productId', as: 'reviews' });
+Review.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+Order.hasMany(Review, { foreignKey: 'orderId', as: 'reviews' });
+Review.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+
 module.exports = {
   Shop, Category, Product, Inventory,
   Order, OrderItem, PromoCode, Invoice,
-  DeliveryTask, ReturnRequest,
+  DeliveryTask, ReturnRequest, Review,
 };

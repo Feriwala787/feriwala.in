@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
+const { routeError } = require('../utils/routeError');
 const DeliveryTask = require('../models/pg/DeliveryTask');
 const ReturnRequest = require('../models/pg/ReturnRequest');
 const Order = require('../models/pg/Order');
@@ -104,7 +105,7 @@ router.get('/agents/nearby/:shopId', authenticate, authorize('shop_admin', 'admi
 
     res.json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -180,7 +181,7 @@ router.post('/tasks', authenticate, authorize('shop_admin', 'admin'), [
 
     res.status(201).json({ success: true, data: task });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -213,7 +214,7 @@ router.get('/my-tasks', authenticate, authorize('delivery_agent'), async (req, r
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -233,7 +234,7 @@ router.put('/tasks/:id/accept', authenticate, authorize('delivery_agent'), async
 
     res.json({ success: true, data: task });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -307,7 +308,7 @@ router.put('/tasks/:id/status', authenticate, authorize('delivery_agent'), async
 
     res.json({ success: true, data: task });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -321,7 +322,7 @@ router.put('/location', authenticate, authorize('delivery_agent'), async (req, r
     );
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -336,7 +337,7 @@ router.put('/online-status', authenticate, authorize('delivery_agent'), async (r
     );
     res.json({ success: true, data: profile });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -353,7 +354,7 @@ router.put('/online', authenticate, authorize('delivery_agent'), async (req, res
     );
     res.json({ success: true, data: profile });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -399,7 +400,7 @@ router.post('/returns', authenticate, authorize('customer'), [
 
     res.status(201).json({ success: true, data: returnReq });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -413,7 +414,7 @@ router.get('/returns/my', authenticate, authorize('customer'), async (req, res) 
     });
     res.json({ success: true, data: requests });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -470,7 +471,7 @@ router.get('/order/:orderId/status', authenticate, authorize('customer', 'shop_a
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -494,7 +495,7 @@ router.get('/returns/shop/:shopId', authenticate, authorize('shop_admin', 'admin
 
     res.json({ success: true, data: requests });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -567,7 +568,7 @@ router.put('/returns/:id/process', authenticate, authorize('shop_admin', 'admin'
 
     res.json({ success: true, data: returnReq });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -706,7 +707,7 @@ router.post('/returns/day-end-plan', authenticate, authorize('shop_admin', 'admi
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -733,7 +734,7 @@ router.put('/returns/:id/verify', authenticate, authorize('delivery_agent'), asy
 
     res.json({ success: true, data: returnReq });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -802,7 +803,7 @@ router.put('/tasks/:id/reassign', authenticate, authorize('shop_admin', 'admin')
 
     res.json({ success: true, data: task });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -839,7 +840,7 @@ router.get('/shop-tasks/:shopId', authenticate, authorize('shop_admin', 'admin')
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 

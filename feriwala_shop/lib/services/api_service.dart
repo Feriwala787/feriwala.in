@@ -30,27 +30,76 @@ class ShopApiService {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('shop_access_token');
+    await prefs.remove('shop_refresh_token');
   }
 
-  Future<Map<String, dynamic>> get(String endpoint, {Map<String, String>? queryParams}) async {
+  Future<bool> _tryRefreshToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final refreshToken = prefs.getString('shop_refresh_token');
+      if (refreshToken == null) return false;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) return false;
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final accessToken = data['data']?['accessToken'];
+      final newRefreshToken = data['data']?['refreshToken'];
+      if (accessToken == null) return false;
+
+      await setToken(accessToken.toString());
+      if (newRefreshToken != null) {
+        await prefs.setString('shop_refresh_token', newRefreshToken.toString());
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> _requestWithAutoRefresh(
+      Future<http.Response> Function() requestFn) async {
+    final response = await requestFn();
+    if (response.statusCode != 401) return _handleResponse(response);
+
+    final refreshed = await _tryRefreshToken();
+    if (!refreshed) return _handleResponse(response);
+
+    final retryResponse = await requestFn();
+    return _handleResponse(retryResponse);
+  }
+
+  Future<Map<String, dynamic>> get(String endpoint,
+      {Map<String, String>? queryParams}) async {
     final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: queryParams);
-    final response = await http.get(uri, headers: _headers);
-    return _handleResponse(response);
+    return _requestWithAutoRefresh(() => http.get(uri, headers: _headers));
   }
 
-  Future<Map<String, dynamic>> post(String endpoint, {Map<String, dynamic>? body}) async {
-    final response = await http.post(Uri.parse('$baseUrl$endpoint'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(response);
+  Future<Map<String, dynamic>> post(String endpoint,
+      {Map<String, dynamic>? body}) async {
+    return _requestWithAutoRefresh(() => http.post(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: _headers,
+          body: jsonEncode(body),
+        ));
   }
 
-  Future<Map<String, dynamic>> put(String endpoint, {Map<String, dynamic>? body}) async {
-    final response = await http.put(Uri.parse('$baseUrl$endpoint'), headers: _headers, body: jsonEncode(body));
-    return _handleResponse(response);
+  Future<Map<String, dynamic>> put(String endpoint,
+      {Map<String, dynamic>? body}) async {
+    return _requestWithAutoRefresh(() => http.put(
+          Uri.parse('$baseUrl$endpoint'),
+          headers: _headers,
+          body: jsonEncode(body),
+        ));
   }
 
   Future<Map<String, dynamic>> delete(String endpoint) async {
-    final response = await http.delete(Uri.parse('$baseUrl$endpoint'), headers: _headers);
-    return _handleResponse(response);
+    return _requestWithAutoRefresh(
+        () => http.delete(Uri.parse('$baseUrl$endpoint'), headers: _headers));
   }
 
   Map<String, dynamic> _handleResponse(http.Response response) {

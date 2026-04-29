@@ -4,6 +4,7 @@ const User = require('../models/mongo/User');
 const DeliveryAgentProfile = require('../models/mongo/DeliveryAgentProfile');
 const { generateTokens, generateLoginId } = require('../utils/helpers');
 const { authenticate } = require('../middleware/auth');
+const { routeError } = require('../utils/routeError');
 const { isMongoReady } = require('../database/mongodb');
 const jwt = require('jsonwebtoken');
 
@@ -73,7 +74,7 @@ router.post('/register', [
       data: { user, ...tokens },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -114,7 +115,7 @@ router.post('/login', [
 
     res.json({ success: true, data: { user, ...tokens } });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -164,7 +165,7 @@ router.put('/profile', authenticate, [
     const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
     res.json({ success: true, data: user });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -189,7 +190,7 @@ router.post('/addresses', authenticate, [
     await user.save();
     res.json({ success: true, data: user.addresses });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -201,7 +202,7 @@ router.post('/logout', authenticate, async (req, res) => {
     await req.user.save();
     res.json({ success: true, message: 'Logged out' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 

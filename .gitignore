@@ -3,6 +3,8 @@ backend/.env
 deployment/.env
 deployment/backend.env
 *.pem
+*.pem.pub
+*.pem.downloaded
 *.key
 *.p12
 *.jks

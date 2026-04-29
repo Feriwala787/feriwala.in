@@ -214,18 +214,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 16),
             const Text('Payment Method', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            ...['cod', 'online', 'upi', 'card'].map((method) => RadioListTile<String>(
-                  value: method,
-                  groupValue: _paymentMethod,
-                  onChanged: (v) => setState(() => _paymentMethod = v!),
-                  title: Text({
-                    'cod': 'Cash on Delivery',
-                    'online': 'Online Payment',
-                    'upi': 'UPI',
-                    'card': 'Card',
-                  }[method]!),
-                  activeColor: const Color(0xFFF47721),
-                )),
+            // TODO: add 'online', 'upi', 'card' once payment gateway is integrated
+            RadioListTile<String>(
+              value: 'cod',
+              groupValue: _paymentMethod,
+              onChanged: (v) => setState(() => _paymentMethod = v!),
+              title: const Text('Cash on Delivery'),
+              activeColor: const Color(0xFFF47721),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Online payment coming soon',
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              ),
+            ),
 
             const SizedBox(height: 16),
             const Text('Active Promo Codes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),

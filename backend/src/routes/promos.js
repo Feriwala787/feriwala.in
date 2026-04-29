@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
+const { routeError } = require('../utils/routeError');
 const PromoCode = require('../models/pg/PromoCode');
 const Order = require('../models/pg/Order');
 const { Op } = require('sequelize');
@@ -20,7 +21,7 @@ router.get('/shop/:shopId', async (req, res) => {
     });
     res.json({ success: true, data: promos });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -56,7 +57,7 @@ router.post('/', authenticate, authorize('shop_admin', 'admin'), [
 
     res.status(201).json({ success: true, data: promo });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -84,7 +85,7 @@ router.put('/:id', authenticate, authorize('shop_admin', 'admin'), async (req, r
     await promo.update(updates);
     res.json({ success: true, data: promo });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -101,7 +102,7 @@ router.delete('/:id', authenticate, authorize('shop_admin', 'admin'), async (req
     await promo.update({ isActive: false });
     res.json({ success: true, message: 'Promo code deactivated' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -194,7 +195,7 @@ router.post('/validate', authenticate, [
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -213,7 +214,7 @@ router.get('/manage/:shopId', authenticate, authorize('shop_admin', 'admin'), as
 
     res.json({ success: true, data: promos });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 

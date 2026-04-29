@@ -26,7 +26,7 @@ async function connectPostgres() {
 }
 
 async function syncModels() {
-  // Import all models to register them
+  // Import all models to register them, then set up associations
   require('../models/pg/Shop');
   require('../models/pg/Product');
   require('../models/pg/Category');
@@ -37,11 +37,15 @@ async function syncModels() {
   require('../models/pg/DeliveryTask');
   require('../models/pg/ReturnRequest');
   require('../models/pg/Inventory');
+  require('../models/pg/Review');
 
-  // Setup associations
+  // Associations must be set up before any sync or query
   require('../models/pg/associations');
 
-  await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
+  // Use sync({ force: false }) in all environments — schema changes should go
+  // through migrations (sequelize-cli). Never use alter:true in production as
+  // it can silently drop columns.
+  await sequelize.sync({ force: false });
 }
 
 module.exports = { sequelize, connectPostgres, syncModels };

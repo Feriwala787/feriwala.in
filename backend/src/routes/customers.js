@@ -1,13 +1,14 @@
 const router = require('express').Router();
 const { authenticate, authorize } = require('../middleware/auth');
+const { routeError } = require('../utils/routeError');
 const Shop = require('../models/pg/Shop');
 const Product = require('../models/pg/Product');
 const Category = require('../models/pg/Category');
 const Inventory = require('../models/pg/Inventory');
-const { calculateDistance } = require('../utils/helpers');
 const { Op, Sequelize } = require('sequelize');
+const { sequelize } = require('../database/postgres');
 
-// Get nearby shops for customer
+// Get nearby shops for customer — uses SQL Haversine to filter at DB level
 router.get('/nearby-shops', authenticate, async (req, res) => {
   try {
     const { lat, lng, radius = 10 } = req.query;
@@ -15,22 +16,46 @@ router.get('/nearby-shops', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Location required' });
     }
 
-    const shops = await Shop.findAll({ where: { isActive: true } });
+    const latF = parseFloat(lat);
+    const lngF = parseFloat(lng);
+    const radiusF = parseFloat(radius);
 
-    const nearby = shops
-      .map(shop => ({
-        ...shop.toJSON(),
-        distance: calculateDistance(
-          parseFloat(lat), parseFloat(lng),
-          parseFloat(shop.latitude), parseFloat(shop.longitude)
-        ),
-      }))
-      .filter(shop => shop.distance <= parseFloat(radius))
-      .sort((a, b) => a.distance - b.distance);
+    if (isNaN(latF) || isNaN(lngF) || isNaN(radiusF)) {
+      return res.status(400).json({ success: false, message: 'Invalid location parameters' });
+    }
 
-    res.json({ success: true, data: nearby });
+    // Haversine formula in SQL — returns distance in km
+    const distanceExpr = Sequelize.literal(`
+      6371 * 2 * ASIN(SQRT(
+        POWER(SIN(RADIANS(${latF} - CAST(latitude AS FLOAT)) / 2), 2) +
+        COS(RADIANS(${latF})) * COS(RADIANS(CAST(latitude AS FLOAT))) *
+        POWER(SIN(RADIANS(${lngF} - CAST(longitude AS FLOAT)) / 2), 2)
+      ))
+    `);
+
+    const shops = await Shop.findAll({
+      where: {
+        isActive: true,
+        latitude: { [Op.ne]: null },
+        longitude: { [Op.ne]: null },
+      },
+      attributes: {
+        include: [[distanceExpr, 'distance']],
+      },
+      having: Sequelize.literal(`
+        6371 * 2 * ASIN(SQRT(
+          POWER(SIN(RADIANS(${latF} - CAST(latitude AS FLOAT)) / 2), 2) +
+          COS(RADIANS(${latF})) * COS(RADIANS(CAST(latitude AS FLOAT))) *
+          POWER(SIN(RADIANS(${lngF} - CAST(longitude AS FLOAT)) / 2), 2)
+        )) <= ${radiusF}
+      `),
+      order: Sequelize.literal('distance ASC'),
+      group: ['Shop.id'],
+    });
+
+    res.json({ success: true, data: shops });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -74,7 +99,7 @@ router.get('/home-feed', async (req, res) => {
       data: { featured, newArrivals, categories },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -117,7 +142,7 @@ router.get('/search', async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 

@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { body, query, validationResult } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
+const { routeError } = require('../utils/routeError');
 const Shop = require('../models/pg/Shop');
 const { Op } = require('sequelize');
 
@@ -30,7 +31,7 @@ router.get('/', async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -41,7 +42,7 @@ router.get('/:id', async (req, res) => {
     if (!shop) return res.status(404).json({ success: false, message: 'Shop not found' });
     res.json({ success: true, data: shop });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -72,7 +73,7 @@ router.put('/:id', authenticate, authorize('shop_admin', 'admin'), [
     await shop.update(updates);
     res.json({ success: true, data: shop });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -102,7 +103,7 @@ router.get('/:id/stats', authenticate, authorize('shop_admin', 'admin'), async (
       data: { totalOrders, todayOrders, totalProducts, pendingOrders },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 

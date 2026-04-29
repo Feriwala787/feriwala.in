@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
+const { routeError } = require('../utils/routeError');
 const Shop = require('../models/pg/Shop');
 const Category = require('../models/pg/Category');
 const User = require('../models/mongo/User');
@@ -41,7 +42,7 @@ router.post('/shops', [
 
     res.status(201).json({ success: true, data: shop });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -51,7 +52,7 @@ router.get('/shops', async (req, res) => {
     const shops = await Shop.findAll({ order: [['createdAt', 'DESC']] });
     res.json({ success: true, data: shops });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -72,7 +73,7 @@ router.put('/shops/:shopId/assign-user', [
 
     res.json({ success: true, message: 'User assigned to shop', data: { user, shop } });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -90,7 +91,7 @@ router.post('/categories', [
     const category = await Category.create(req.body);
     res.status(201).json({ success: true, data: category });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -103,7 +104,7 @@ router.put('/categories/:id', async (req, res) => {
     await category.update(req.body);
     res.json({ success: true, data: category });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -167,7 +168,7 @@ router.post('/categories/seed-apparel', async (req, res) => {
       data: { created, updated },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -201,7 +202,7 @@ router.get('/users', async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -215,7 +216,7 @@ router.put('/users/:id/status', async (req, res) => {
     await user.save();
     res.json({ success: true, data: user });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -238,7 +239,7 @@ router.get('/dashboard', async (req, res) => {
       data: { totalShops, totalUsers, totalOrders, todayOrders, totalProducts },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 

@@ -44,6 +44,8 @@ class ShopAuthProvider extends ChangeNotifier {
       if (_user!['role'] != 'shop_admin') throw Exception('Shop admin access only');
       _shopId = _user?['shopId'];
       await _api.setToken(res['data']['accessToken']);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('shop_refresh_token', res['data']['refreshToken']);
       _isAuthenticated = true;
     } finally {
       _isLoading = false;

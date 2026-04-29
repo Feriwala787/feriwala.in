@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
 const { authenticate, authorize } = require('../middleware/auth');
+const { routeError } = require('../utils/routeError');
 const Order = require('../models/pg/Order');
 const OrderItem = require('../models/pg/OrderItem');
 const Product = require('../models/pg/Product');
@@ -21,7 +22,8 @@ router.post('/', authenticate, authorize('customer'), [
   body('items.*.productId').isInt(),
   body('items.*.quantity').isInt({ min: 1 }),
   body('deliveryAddress').isObject(),
-  body('paymentMethod').isIn(['cod', 'online', 'upi', 'card']),
+  // TODO: expand to ['cod', 'online', 'upi', 'card'] once paymentService is wired
+  body('paymentMethod').isIn(['cod']).withMessage('Only Cash on Delivery is supported currently'),
 ], async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -190,7 +192,7 @@ router.post('/', authenticate, authorize('customer'), [
     res.status(201).json({ success: true, data: fullOrder });
   } catch (error) {
     await t.rollback();
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -223,7 +225,7 @@ router.get('/my-orders', authenticate, authorize('customer'), async (req, res) =
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -293,7 +295,7 @@ router.put('/:id/cancel', authenticate, authorize('customer'), async (req, res) 
     res.json({ success: true, data: order });
   } catch (error) {
     await t.rollback();
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -328,7 +330,7 @@ router.get('/shop/:shopId', authenticate, authorize('shop_admin', 'admin'), asyn
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -409,7 +411,7 @@ router.put('/:id/status', authenticate, authorize('shop_admin', 'admin'), async 
 
     res.json({ success: true, data: order });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
@@ -438,7 +440,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json({ success: true, data: order });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    routeError(res, error);
   }
 });
 
