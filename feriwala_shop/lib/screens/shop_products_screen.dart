@@ -128,6 +128,19 @@ class _ShopProductsScreenState extends State<ShopProductsScreen> {
                     ],
                   ),
                 ),
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Product listing is available only on the web Product Listing Portal. This app is for viewing and managing listed products.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
 
                 // ── Search ─────────────────────────────────────────────────
                 Padding(

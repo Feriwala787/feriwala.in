@@ -467,7 +467,7 @@ export default function ShopProducts() {
       <div>
         <h2 className="text-2xl font-bold text-gray-800">Product Listing Portal</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Shop owners can now manage products here using their existing portal credentials.
+          Shop admins can list new products only here in the web portal. Mobile app supports viewing/managing listed products.
         </p>
       </div>
 

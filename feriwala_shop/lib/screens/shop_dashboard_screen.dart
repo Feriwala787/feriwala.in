@@ -81,7 +81,7 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
 
               _ActionTile(icon: Icons.receipt_long, title: 'Orders', subtitle: 'Manage incoming orders',
                   onTap: () => Navigator.pushNamed(context, '/orders')),
-              _ActionTile(icon: Icons.checkroom, title: 'Products', subtitle: 'Add and manage products',
+              _ActionTile(icon: Icons.checkroom, title: 'Products', subtitle: 'View products (listing on web portal only)',
                   onTap: () => Navigator.pushNamed(context, '/products')),
               _ActionTile(icon: Icons.inventory_2, title: 'Inventory', subtitle: 'Track stock levels',
                   onTap: () => Navigator.pushNamed(context, '/inventory')),
