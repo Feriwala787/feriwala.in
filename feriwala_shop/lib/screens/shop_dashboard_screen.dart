@@ -70,7 +70,6 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
                   children: [
                     _StatCard(title: 'Total Orders', value: '${_stats!['totalOrders']}', icon: Icons.receipt, color: Colors.blue),
                     _StatCard(title: "Today's Orders", value: '${_stats!['todayOrders']}', icon: Icons.today, color: Colors.orange),
-                    _StatCard(title: 'Products', value: '${_stats!['totalProducts']}', icon: Icons.checkroom, color: Colors.green),
                     _StatCard(title: 'Pending', value: '${_stats!['pendingOrders']}', icon: Icons.pending_actions, color: Colors.red),
                   ],
                 ),
@@ -81,8 +80,6 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
 
               _ActionTile(icon: Icons.receipt_long, title: 'Orders', subtitle: 'Manage incoming orders',
                   onTap: () => Navigator.pushNamed(context, '/orders')),
-              _ActionTile(icon: Icons.checkroom, title: 'Products', subtitle: 'View products (listing on web portal only)',
-                  onTap: () => Navigator.pushNamed(context, '/products')),
               _ActionTile(icon: Icons.inventory_2, title: 'Inventory', subtitle: 'Track stock levels',
                   onTap: () => Navigator.pushNamed(context, '/inventory')),
               _ActionTile(icon: Icons.local_offer, title: 'Promo Codes', subtitle: 'Create deals and offers',

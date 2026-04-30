@@ -4,7 +4,6 @@ import 'services/api_service.dart';
 import 'providers/shop_auth_provider.dart';
 import 'screens/shop_login_screen.dart';
 import 'screens/shop_dashboard_screen.dart';
-import 'screens/shop_products_screen.dart';
 import 'screens/shop_orders_screen.dart';
 import 'screens/order_detail_screen.dart';
 import 'screens/shop_promos_screen.dart';
@@ -45,7 +44,6 @@ class FeriwalaShopApp extends StatelessWidget {
         routes: {
           '/login': (context) => const ShopLoginScreen(),
           '/dashboard': (context) => const ShopDashboardScreen(),
-          '/products': (context) => const ShopProductsScreen(),
           '/orders': (context) => const ShopOrdersScreen(),
           '/promos': (context) => const ShopPromosScreen(),
           '/inventory': (context) => const ShopInventoryScreen(),
