@@ -45,7 +45,11 @@ class _ShopLoginScreenState extends State<ShopLoginScreen> {
               key: _formKey,
               child: Column(
                 children: [
-                  const Icon(Icons.store, size: 64, color: Color(0xFFF47721)),
+                  const Image(
+                    image: AssetImage('assets/images/app_icon.png'),
+                    width: 80,
+                    height: 80,
+                  ),
                   const SizedBox(height: 16),
                   const Text('Feriwala Shop', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
                   const Text('Outlet Management', style: TextStyle(color: Colors.white54)),

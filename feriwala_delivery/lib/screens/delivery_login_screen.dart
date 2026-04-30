@@ -45,7 +45,11 @@ class _DeliveryLoginScreenState extends State<DeliveryLoginScreen> {
               key: _formKey,
               child: Column(
                 children: [
-                  const Icon(Icons.delivery_dining, size: 64, color: Color(0xFFF47721)),
+                  const Image(
+                    image: AssetImage('assets/images/app_icon.png'),
+                    width: 80,
+                    height: 80,
+                  ),
                   const SizedBox(height: 16),
                   const Text('Feriwala Delivery', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
                   const Text('Agent Portal', style: TextStyle(color: Colors.white54)),

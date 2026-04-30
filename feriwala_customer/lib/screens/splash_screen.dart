@@ -28,7 +28,11 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.shopping_bag_rounded, size: 80, color: Colors.white),
+            const Image(
+              image: AssetImage('assets/images/app_icon.png'),
+              width: 100,
+              height: 100,
+            ),
             const SizedBox(height: 16),
             Text(
               'Feriwala',

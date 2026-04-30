@@ -53,7 +53,11 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 60),
-                const Icon(Icons.shopping_bag_rounded, size: 64, color: Color(0xFFF47721)),
+                const Image(
+                  image: AssetImage('assets/images/app_icon.png'),
+                  width: 80,
+                  height: 80,
+                ),
                 const SizedBox(height: 16),
                 Text('Welcome to Feriwala',
                     textAlign: TextAlign.center,

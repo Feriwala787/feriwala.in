@@ -28,8 +28,13 @@ export default function Layout() {
     <div className="min-h-screen bg-gray-100 md:flex">
       <aside className="bg-feriwala-dark text-white md:w-64 md:min-h-screen">
         <div className="p-6 border-b border-gray-700">
-          <h1 className="text-2xl font-bold text-primary-400">🛒 Feriwala</h1>
-          <p className="text-sm text-gray-400 mt-1">{portalLabel}</p>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Feriwala" className="w-10 h-10 rounded-lg object-cover" />
+            <div>
+              <h1 className="text-xl font-bold text-primary-400">Feriwala</h1>
+              <p className="text-xs text-gray-400">{portalLabel}</p>
+            </div>
+          </div>
         </div>
 
         <nav className="p-4 flex gap-2 overflow-x-auto md:block md:space-y-1 md:overflow-visible">
