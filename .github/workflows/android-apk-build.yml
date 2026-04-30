@@ -60,15 +60,12 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Generate launcher icons
-        run: dart run flutter_launcher_icons
-
-      - name: Build APK (release, split per ABI)
-        run: flutter build apk --release --split-per-abi
+      - name: Build APK (debug, fat)
+        run: flutter build apk --debug
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-apk
-          path: ${{ matrix.app }}/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          path: ${{ matrix.app }}/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
