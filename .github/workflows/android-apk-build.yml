@@ -60,12 +60,12 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build APK (release, fat)
-        run: flutter build apk --release
+      - name: Build APK (debug)
+        run: flutter build apk --debug
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.app }}-apk
-          path: ${{ matrix.app }}/build/app/outputs/flutter-apk/app-release.apk
+          name: ${{ matrix.app }}-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
