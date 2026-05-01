@@ -434,6 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: () async {
+                _page = 1;
                 await _loadHomeFeed();
                 await _requestPermissionsAndLoadNearbyWarehouses();
                 await _loadBrowseProducts();
@@ -495,6 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   );
                                   if (found != null) {
                                     setState(() => _selectedWarehouse = found as Map<String, dynamic>);
+                                    _page = 1;
                                     _loadBrowseProducts();
                                   }
                                 },
@@ -539,7 +541,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Wrap(
                           spacing: 8,
-                          children: _searchSuggestions.map((s) => ActionChip(label: Text(s), onPressed: () { _searchController.text = s; _loadBrowseProducts(); })).toList(),
+                          children: _searchSuggestions.map((s) => ActionChip(label: Text(s), onPressed: () {
+                            _searchController.text = s;
+                            _page = 1;
+                            AnalyticsService().track('search_suggestion_clicked', props: {'suggestion': s});
+                            _loadBrowseProducts();
+                          })).toList(),
                         ),
                       ),
                     Padding(
@@ -602,6 +609,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               selected: {_selectedGender},
                               onSelectionChanged: (set) {
                                 setState(() => _selectedGender = set.first);
+                                _page = 1;
+                                AnalyticsService().track('gender_changed', props: {'gender': set.first});
                                 _loadBrowseProducts();
                               },
                             ),
@@ -646,6 +655,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _selectedCategoryName = name;
                                 }
                               });
+                              _page = 1;
+                              AnalyticsService().track('category_changed', props: {'category': _selectedCategoryName});
                               _loadBrowseProducts();
                             },
                           ),
@@ -668,7 +679,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               DropdownMenuItem(value: 'best_rated', child: Text('Best Rated')),
                               DropdownMenuItem(value: 'price_low_to_high', child: Text('Price Low to High')),
                             ],
-                              onChanged: (value) {
+                            onChanged: (value) {
                               if (value == null) return;
                               setState(() => _selectedSort = value);
                               AnalyticsService().track('sort_changed', props: {'sort': value});
@@ -801,7 +812,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 10),
                             child: OutlinedButton(
-                              onPressed: () {
+                              onPressed: _productLoading ? null : () {
                                 _page += 1;
                                 AnalyticsService().track('load_more_clicked', props: {'next_page': _page});
                                 _loadBrowseProducts();
