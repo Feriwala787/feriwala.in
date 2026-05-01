@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
@@ -11,9 +12,38 @@ import 'screens/shop_inventory_screen.dart';
 import 'screens/delivery_management_screen.dart';
 import 'screens/shop_returns_screen.dart';
 
+int? _parseRouteInt(Object? value) {
+  if (value is int) return value;
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+Route<dynamic> _invalidRoute(String routeName) {
+  return MaterialPageRoute(
+    builder: (_) => Scaffold(
+      appBar: AppBar(title: const Text('Invalid navigation')),
+      body: Center(child: Text('Could not open route: $routeName')),
+    ),
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ShopApiService().init();
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('Shop uncaught Flutter error: ${details.exceptionAsString()}');
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Shop platform error: $error');
+    return true;
+  };
+
+  try {
+    await ShopApiService().init();
+  } catch (error) {
+    debugPrint('Shop API init failed: $error');
+  }
   runApp(const FeriwalaShopApp());
 }
 
@@ -52,13 +82,15 @@ class FeriwalaShopApp extends StatelessWidget {
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/order-detail') {
-            final orderId = settings.arguments as int;
+            final orderId = _parseRouteInt(settings.arguments);
+            if (orderId == null) return _invalidRoute('/order-detail');
             return MaterialPageRoute(
               builder: (context) => ShopOrderDetailScreen(orderId: orderId),
             );
           }
           return null;
         },
+        onUnknownRoute: (settings) => _invalidRoute(settings.name ?? 'unknown'),
       ),
     );
   }
