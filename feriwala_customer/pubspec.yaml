@@ -16,7 +16,7 @@ dependencies:
   geolocator: ^10.1.0
   permission_handler: ^11.3.1
   socket_io_client: ^2.0.3+1
-  amazon_location_flutterpluginsdk: ^1.0.3
+  amazon_location_flutter: ^0.1.0
   cached_network_image: ^3.3.0
   flutter_rating_bar: ^4.0.1
   shimmer: ^3.0.0
