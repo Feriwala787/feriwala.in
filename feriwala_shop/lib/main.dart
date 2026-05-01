@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'services/error_reporter.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'providers/shop_auth_provider.dart';
@@ -31,18 +33,24 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    debugPrint('Shop uncaught Flutter error: ${details.exceptionAsString()}');
+    ErrorReporter.message('uncaught Flutter error: ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      ErrorReporter.report(details.exception, details.stack!, context: 'flutter');
+    }
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('Shop platform error: $error');
-    return true;
+    ErrorReporter.report(error, stack, context: 'platform');
+    return false;
   };
 
   try {
     await ShopApiService().init();
-  } catch (error) {
-    debugPrint('Shop API init failed: $error');
+  } catch (error, stackTrace) {
+    ErrorReporter.report(error, stackTrace, context: 'api-init');
+    if (!kReleaseMode) {
+      rethrow;
+    }
   }
   runApp(const FeriwalaShopApp());
 }

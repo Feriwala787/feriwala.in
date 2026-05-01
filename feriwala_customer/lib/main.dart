@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'services/error_reporter.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
@@ -39,18 +41,24 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    debugPrint('Customer uncaught Flutter error: ${details.exceptionAsString()}');
+    ErrorReporter.message('uncaught Flutter error: ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      ErrorReporter.report(details.exception, details.stack!, context: 'flutter');
+    }
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('Customer platform error: $error');
-    return true;
+    ErrorReporter.report(error, stack, context: 'platform');
+    return false;
   };
 
   try {
     await ApiService().init();
-  } catch (error) {
-    debugPrint('Customer API init failed: $error');
+  } catch (error, stackTrace) {
+    ErrorReporter.report(error, stackTrace, context: 'api-init');
+    if (!kReleaseMode) {
+      rethrow;
+    }
   }
   runApp(const FeriwalaCustomerApp());
 }

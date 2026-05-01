@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'services/error_reporter.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'providers/delivery_auth_provider.dart';
@@ -28,18 +30,24 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    debugPrint('Delivery uncaught Flutter error: ${details.exceptionAsString()}');
+    ErrorReporter.message('uncaught Flutter error: ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      ErrorReporter.report(details.exception, details.stack!, context: 'flutter');
+    }
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('Delivery platform error: $error');
-    return true;
+    ErrorReporter.report(error, stack, context: 'platform');
+    return false;
   };
 
   try {
     await DeliveryApiService().init();
-  } catch (error) {
-    debugPrint('Delivery API init failed: $error');
+  } catch (error, stackTrace) {
+    ErrorReporter.report(error, stackTrace, context: 'api-init');
+    if (!kReleaseMode) {
+      rethrow;
+    }
   }
   runApp(const FeriwalaDeliveryApp());
 }
