@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
+import '../services/error_reporter.dart';
 import '../providers/cart_provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -37,6 +39,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _etaUnder30Filter = false;
   static const List<String> _occasions = ['Office', 'Wedding', 'Gym', 'Travel', 'Daily Wear'];
   String? _selectedOccasion;
+  int _page = 1;
+  bool _hasMoreProducts = true;
 
   static const double _maxWarehouseDistanceKm = 10;
 
@@ -271,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadBrowseProducts() async {
     setState(() => _productLoading = true);
     try {
-      final params = <String, String>{'limit': '20'};
+      final params = <String, String>{'limit': '20', 'page': '$_page'};
       params['gender'] = _selectedGender;
       if (_selectedCategoryId != null) params['categoryId'] = '$_selectedCategoryId';
       if (_searchController.text.trim().isNotEmpty) {
@@ -289,10 +293,13 @@ class _HomeScreenState extends State<HomeScreen> {
           .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
           .toList();
       setState(() {
-        _browseProducts = _applyLocalFilters(products);
+        _browseProducts = _page == 1 ? _applyLocalFilters(products) : [..._browseProducts, ..._applyLocalFilters(products)];
+        _hasMoreProducts = products.length >= 20;
       });
+      AnalyticsService().track('browse_products_loaded', props: {'page': _page, 'count': products.length});
     } catch (_) {
       setState(() => _browseProducts = []);
+      ErrorReporter.message('browse_products_load_failed');
     } finally {
       if (mounted) setState(() => _productLoading = false);
     }
@@ -506,7 +513,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.arrow_forward),
-                            onPressed: _loadBrowseProducts,
+                            onPressed: () {
+                              AnalyticsService().track('search_submitted', props: {'source': 'arrow'});
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
                           ),
                           filled: true,
                           fillColor: Colors.grey[100],
@@ -516,7 +527,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         onChanged: _updateSearchSuggestions,
-                        onSubmitted: (_) => _loadBrowseProducts(),
+                        onSubmitted: (_) {
+                          AnalyticsService().track('search_submitted', props: {'source': 'keyboard'});
+                          _page = 1;
+                          _loadBrowseProducts();
+                        },
                       ),
                     ),
                     if (_searchSuggestions.isNotEmpty)
@@ -562,7 +577,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                     child: ChoiceChip(
                                       label: Text(occasion),
                                       selected: _selectedOccasion == occasion,
-                                      onSelected: (_) => setState(() => _selectedOccasion = _selectedOccasion == occasion ? null : occasion),
+                                      onSelected: (_) {
+                                        setState(() => _selectedOccasion = _selectedOccasion == occasion ? null : occasion);
+                                        AnalyticsService().track('occasion_chip_clicked', props: {'occasion': occasion});
+                                      },
                                     ),
                                   ))
                               .toList(),
@@ -650,9 +668,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               DropdownMenuItem(value: 'best_rated', child: Text('Best Rated')),
                               DropdownMenuItem(value: 'price_low_to_high', child: Text('Price Low to High')),
                             ],
-                            onChanged: (value) {
+                              onChanged: (value) {
                               if (value == null) return;
                               setState(() => _selectedSort = value);
+                              AnalyticsService().track('sort_changed', props: {'sort': value});
+                              _page = 1;
                               _loadBrowseProducts();
                             },
                           ),
@@ -661,6 +681,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             selected: _maxPriceFilter == 499,
                             onSelected: (selected) {
                               setState(() => _maxPriceFilter = selected ? 499 : null);
+                              AnalyticsService().track('filter_applied', props: {'filter': 'max_price_499', 'selected': selected});
+                              _page = 1;
                               _loadBrowseProducts();
                             },
                           ),
@@ -669,6 +691,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             selected: _minDiscountFilter == 30,
                             onSelected: (selected) {
                               setState(() => _minDiscountFilter = selected ? 30 : 0);
+                              AnalyticsService().track('filter_applied', props: {'filter': 'discount_30_plus', 'selected': selected});
+                              _page = 1;
                               _loadBrowseProducts();
                             },
                           ),
@@ -677,6 +701,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             selected: _etaUnder30Filter,
                             onSelected: (selected) {
                               setState(() => _etaUnder30Filter = selected);
+                              AnalyticsService().track('filter_applied', props: {'filter': 'eta_under_30', 'selected': selected});
+                              _page = 1;
                               _loadBrowseProducts();
                             },
                           ),
@@ -757,19 +783,33 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Center(child: Text('No products found for current filters.')),
                       )
                     else
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.65,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
+                      Column(children: [
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.65,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                          itemCount: _browseProducts.length,
+                          itemBuilder: (context, index) => _ProductGridItem(product: _browseProducts[index]),
                         ),
-                        itemCount: _browseProducts.length,
-                        itemBuilder: (context, index) => _ProductGridItem(product: _browseProducts[index]),
-                      ),
+                        if (_hasMoreProducts)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: OutlinedButton(
+                              onPressed: () {
+                                _page += 1;
+                                AnalyticsService().track('load_more_clicked', props: {'next_page': _page});
+                                _loadBrowseProducts();
+                              },
+                              child: const Text('Load more'),
+                            ),
+                          ),
+                      ]),
                     const SizedBox(height: 80),
                   ],
                 ),
@@ -883,7 +923,10 @@ class _ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final images = product['images'] as List? ?? [];
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/product', arguments: product['id']),
+      onTap: () {
+        AnalyticsService().track('product_clicked', props: {'productId': product['id'], 'surface': 'rail_card'});
+        Navigator.pushNamed(context, '/product', arguments: product['id']);
+      },
       child: Container(
         width: 160,
         margin: const EdgeInsets.only(right: 12),
@@ -939,7 +982,10 @@ class _ProductGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final images = product['images'] as List? ?? [];
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/product', arguments: product['id']),
+      onTap: () {
+        AnalyticsService().track('product_clicked', props: {'productId': product['id'], 'surface': 'browse_grid'});
+        Navigator.pushNamed(context, '/product', arguments: product['id']);
+      },
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
