@@ -60,6 +60,9 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Flutter test
+        run: flutter test --reporter=compact
+
       - name: Build APK (debug)
         run: |
           flutter build apk --debug \
