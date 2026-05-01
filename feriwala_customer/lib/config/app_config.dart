@@ -8,10 +8,9 @@ class AppConfig {
     'SOCKET_URL',
     defaultValue: 'https://api.feriwala.in',
   );
-  // Pass at build time: flutter build apk --dart-define=GOOGLE_MAPS_API_KEY=...
-  static const String googleMapsApiKey = String.fromEnvironment(
-    'GOOGLE_MAPS_API_KEY',
-    defaultValue: '',
-  );
+  static const String awsRegion = 'ap-south-1';
+  static const String awsAccessKeyId = String.fromEnvironment('AWS_ACCESS_KEY_ID', defaultValue: '');
+  static const String awsSecretAccessKey = String.fromEnvironment('AWS_SECRET_ACCESS_KEY', defaultValue: '');
+  static const String awsMapName = 'feriwala-map';
+  static const String awsPlaceIndexName = 'feriwala-places';
 }
-

@@ -61,7 +61,10 @@ jobs:
         run: flutter pub get
 
       - name: Build APK (debug)
-        run: flutter build apk --debug
+        run: |
+          flutter build apk --debug \
+            --dart-define=AWS_ACCESS_KEY_ID=${{ secrets.AWS_LOCATION_ACCESS_KEY_ID }} \
+            --dart-define=AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_LOCATION_SECRET_ACCESS_KEY }}
 
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
