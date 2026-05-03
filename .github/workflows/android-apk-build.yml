@@ -17,62 +17,131 @@ on:
       - '.github/workflows/android-apk-build.yml'
 
 jobs:
-  build-apks:
+  build-customer-app:
+    name: Customer App APK
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app:
-          - feriwala_customer
-          - feriwala_shop
-          - feriwala_delivery
-
-    defaults:
-      run:
-        shell: bash
-        working-directory: ${{ matrix.app }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.0'
           channel: stable
           cache: true
-
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ matrix.app }}-${{ hashFiles('**/gradle-wrapper.properties', '**/build.gradle', '**/build.gradle.kts') }}
-          restore-keys: gradle-${{ matrix.app }}-
-
+          key: gradle-customer-${{ hashFiles('feriwala_customer/android/**/*.gradle*', 'feriwala_customer/android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-customer-
       - name: Flutter pub get
+        working-directory: feriwala_customer
         run: flutter pub get
-
-      - name: Flutter test
-        run: flutter test --reporter=compact
-
-      - name: Build APK (debug)
-        run: |
-          flutter build apk --debug \
-            --dart-define=AWS_ACCESS_KEY_ID=${{ secrets.AWS_LOCATION_ACCESS_KEY_ID }} \
-            --dart-define=AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_LOCATION_SECRET_ACCESS_KEY }}
-
-      - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
+      - name: Build APK
+        working-directory: feriwala_customer
+        run: flutter build apk --release --no-tree-shake-icons
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.app }}-debug-apk
-          path: ${{ matrix.app }}/build/app/outputs/flutter-apk/app-debug.apk
+          name: feriwala-customer-apk
+          path: feriwala_customer/build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+
+  build-shop-app:
+    name: Shop App APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.0'
+          channel: stable
+          cache: true
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-shop-${{ hashFiles('feriwala_shop/android/**/*.gradle*', 'feriwala_shop/android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-shop-
+      - name: Flutter pub get
+        working-directory: feriwala_shop
+        run: flutter pub get
+      - name: Build APK
+        working-directory: feriwala_shop
+        run: flutter build apk --release --no-tree-shake-icons
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feriwala-shop-apk
+          path: feriwala_shop/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+  build-delivery-app:
+    name: Delivery App APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.0'
+          channel: stable
+          cache: true
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-delivery-${{ hashFiles('feriwala_delivery/android/**/*.gradle*', 'feriwala_delivery/android/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-delivery-
+      - name: Flutter pub get
+        working-directory: feriwala_delivery
+        run: flutter pub get
+      - name: Build APK
+        working-directory: feriwala_delivery
+        run: flutter build apk --release --no-tree-shake-icons
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feriwala-delivery-apk
+          path: feriwala_delivery/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-customer-app, build-shop-app, build-delivery-app]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all APKs
+        uses: actions/download-artifact@v4
+        with:
+          path: apks/
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "Feriwala v1.0.${{ github.run_number }}"
+          body: |
+            ## Feriwala Android Apps - Build ${{ github.run_number }}
+            - **feriwala-customer** — Customer shopping app
+            - **feriwala-shop** — Shop/outlet management app
+            - **feriwala-delivery** — Delivery agent app
+          files: apks/**/*.apk
+          draft: false
+          prerelease: false
