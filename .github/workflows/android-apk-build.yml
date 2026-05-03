@@ -28,19 +28,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.0'
-          channel: stable
-          cache: true
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-customer-${{ hashFiles('feriwala_customer/android/**/*.gradle*', 'feriwala_customer/android/**/gradle-wrapper.properties') }}
-          restore-keys: gradle-customer-
-      - name: Flutter pub get
-        working-directory: feriwala_customer
+          flutter-version: '3.41.9'
         run: flutter pub get
       - name: Build APK
         working-directory: feriwala_customer
@@ -62,19 +50,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.0'
-          channel: stable
-          cache: true
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-shop-${{ hashFiles('feriwala_shop/android/**/*.gradle*', 'feriwala_shop/android/**/gradle-wrapper.properties') }}
-          restore-keys: gradle-shop-
-      - name: Flutter pub get
-        working-directory: feriwala_shop
+          flutter-version: '3.41.9'
         run: flutter pub get
       - name: Build APK
         working-directory: feriwala_shop
@@ -96,19 +72,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.0'
-          channel: stable
-          cache: true
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-delivery-${{ hashFiles('feriwala_delivery/android/**/*.gradle*', 'feriwala_delivery/android/**/gradle-wrapper.properties') }}
-          restore-keys: gradle-delivery-
-      - name: Flutter pub get
-        working-directory: feriwala_delivery
+          flutter-version: '3.41.9'
         run: flutter pub get
       - name: Build APK
         working-directory: feriwala_delivery
