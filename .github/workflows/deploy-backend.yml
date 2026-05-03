@@ -49,6 +49,7 @@ jobs:
             --exclude 'uploads' \
             -e "ssh $SSH_OPTS" \
             ./backend/ "$SSH_USER@$SSH_HOST:/home/bitnami/feriwala/backend/"
+          scp $SSH_OPTS ./deployment/ecosystem.config.js "$SSH_USER@$SSH_HOST:/home/bitnami/feriwala/ecosystem.config.js"
 
       - name: Install dependencies and restart
         run: |
