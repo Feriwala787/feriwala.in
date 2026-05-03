@@ -108,6 +108,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: apks/
+      - name: Rename APKs
+        run: |
+          mv apks/feriwala-customer-apk/app-release.apk apks/feriwala-customer-apk/feriwala-customer.apk
+          mv apks/feriwala-shop-apk/app-release.apk apks/feriwala-shop-apk/feriwala-shop.apk
+          mv apks/feriwala-delivery-apk/app-release.apk apks/feriwala-delivery-apk/feriwala-delivery.apk
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
