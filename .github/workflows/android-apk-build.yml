@@ -29,6 +29,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+      - name: Flutter pub get
+        working-directory: feriwala_customer
         run: flutter pub get
       - name: Build APK
         working-directory: feriwala_customer
@@ -51,6 +55,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+      - name: Flutter pub get
+        working-directory: feriwala_shop
         run: flutter pub get
       - name: Build APK
         working-directory: feriwala_shop
@@ -73,6 +81,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+      - name: Flutter pub get
+        working-directory: feriwala_delivery
         run: flutter pub get
       - name: Build APK
         working-directory: feriwala_delivery
