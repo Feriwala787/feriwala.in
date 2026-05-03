@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class CartItem {
   final int productId;
@@ -113,6 +114,13 @@ class CartProvider extends ChangeNotifier {
     } else {
       _items.add(item);
     }
+    AnalyticsService().track('add_to_cart', props: {
+      'productId': item.productId,
+      'shopId': shopId,
+      'quantity': item.quantity,
+      'hasSize': item.size != null,
+      'hasColor': item.color != null,
+    });
     notifyListeners();
     _persist();
   }

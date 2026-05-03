@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
+import '../services/error_reporter.dart';
 import '../providers/cart_provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -31,6 +33,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? _selectedWarehouse;
   List<Map<String, dynamic>> _recentProducts = [];
   List<String> _searchSuggestions = [];
+  String _selectedSort = 'trending';
+  double? _maxPriceFilter;
+  double _minDiscountFilter = 0;
+  bool _etaUnder30Filter = false;
+  static const List<String> _occasions = ['Office', 'Wedding', 'Gym', 'Travel', 'Daily Wear'];
+  String? _selectedOccasion;
+  int _page = 1;
+  bool _hasMoreProducts = true;
 
   static const double _maxWarehouseDistanceKm = 10;
 
@@ -231,10 +241,41 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  List<Map<String, dynamic>> _applyLocalFilters(List<Map<String, dynamic>> items) {
+    var filtered = items.where((p) {
+      final price = double.tryParse((p['price'] ?? '').toString()) ?? 0;
+      final discount = double.tryParse((p['discountPercent'] ?? p['discount'] ?? '').toString()) ?? 0;
+      final etaMins = int.tryParse((p['deliveryEtaMins'] ?? p['etaMins'] ?? '999').toString()) ?? 999;
+
+      final matchesPrice = _maxPriceFilter == null || price <= _maxPriceFilter!;
+      final matchesDiscount = discount >= _minDiscountFilter;
+      final matchesEta = !_etaUnder30Filter || etaMins <= 30;
+      return matchesPrice && matchesDiscount && matchesEta;
+    }).toList();
+
+    switch (_selectedSort) {
+      case 'price_low_to_high':
+        filtered.sort((a, b) => (double.tryParse((a['price'] ?? '').toString()) ?? 0)
+            .compareTo(double.tryParse((b['price'] ?? '').toString()) ?? 0));
+        break;
+      case 'best_rated':
+        filtered.sort((a, b) => (double.tryParse((b['avgRating'] ?? '').toString()) ?? 0)
+            .compareTo(double.tryParse((a['avgRating'] ?? '').toString()) ?? 0));
+        break;
+      case 'fastest_delivery':
+        filtered.sort((a, b) => (int.tryParse((a['deliveryEtaMins'] ?? a['etaMins'] ?? '999').toString()) ?? 999)
+            .compareTo(int.tryParse((b['deliveryEtaMins'] ?? b['etaMins'] ?? '999').toString()) ?? 999));
+        break;
+      default:
+        break;
+    }
+    return filtered;
+  }
+
   Future<void> _loadBrowseProducts() async {
     setState(() => _productLoading = true);
     try {
-      final params = <String, String>{'limit': '20'};
+      final params = <String, String>{'limit': '20', 'page': '$_page'};
       params['gender'] = _selectedGender;
       if (_selectedCategoryId != null) params['categoryId'] = '$_selectedCategoryId';
       if (_searchController.text.trim().isNotEmpty) {
@@ -247,11 +288,18 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_selectedWarehouse != null) params['shopId'] = '${_selectedWarehouse!['id']}';
 
       final res = await ApiService().get('/products', queryParams: params);
+      final products = (res['data'] as List? ?? [])
+          .whereType<Map>()
+          .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
+          .toList();
       setState(() {
-        _browseProducts = res['data'] ?? [];
+        _browseProducts = _page == 1 ? _applyLocalFilters(products) : [..._browseProducts, ..._applyLocalFilters(products)];
+        _hasMoreProducts = products.length >= 20;
       });
+      AnalyticsService().track('browse_products_loaded', props: {'page': _page, 'count': products.length});
     } catch (_) {
       setState(() => _browseProducts = []);
+      ErrorReporter.message('browse_products_load_failed');
     } finally {
       if (mounted) setState(() => _productLoading = false);
     }
@@ -329,6 +377,24 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
   }
 
+  List<Map<String, dynamic>> _browseProductsAsMap() {
+    return _browseProducts.whereType<Map>().map((e) => e.map((k, v) => MapEntry(k.toString(), v))).toList();
+  }
+
+  List<Map<String, dynamic>> _recentlyDroppedPrices() {
+    return _browseProductsAsMap().where((p) {
+      final discount = double.tryParse((p['discount'] ?? p['discountPercent'] ?? '0').toString()) ?? 0;
+      return discount >= 25;
+    }).take(10).toList();
+  }
+
+  List<Map<String, dynamic>> _backInStockProducts() {
+    return _browseProductsAsMap().where((p) {
+      final stock = int.tryParse((p['quantity'] ?? p['stock'] ?? '0').toString()) ?? 0;
+      return stock > 0;
+    }).take(10).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
@@ -368,6 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: () async {
+                _page = 1;
                 await _loadHomeFeed();
                 await _requestPermissionsAndLoadNearbyWarehouses();
                 await _loadBrowseProducts();
@@ -429,6 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   );
                                   if (found != null) {
                                     setState(() => _selectedWarehouse = found as Map<String, dynamic>);
+                                    _page = 1;
                                     _loadBrowseProducts();
                                   }
                                 },
@@ -447,7 +515,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.arrow_forward),
-                            onPressed: _loadBrowseProducts,
+                            onPressed: () {
+                              AnalyticsService().track('search_submitted', props: {'source': 'arrow'});
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
                           ),
                           filled: true,
                           fillColor: Colors.grey[100],
@@ -457,7 +529,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         onChanged: _updateSearchSuggestions,
-                        onSubmitted: (_) => _loadBrowseProducts(),
+                        onSubmitted: (_) {
+                          AnalyticsService().track('search_submitted', props: {'source': 'keyboard'});
+                          _page = 1;
+                          _loadBrowseProducts();
+                        },
                       ),
                     ),
                     if (_searchSuggestions.isNotEmpty)
@@ -465,9 +541,59 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Wrap(
                           spacing: 8,
-                          children: _searchSuggestions.map((s) => ActionChip(label: Text(s), onPressed: () { _searchController.text = s; _loadBrowseProducts(); })).toList(),
+                          children: _searchSuggestions.map((s) => ActionChip(label: Text(s), onPressed: () {
+                            _searchController.text = s;
+                            _page = 1;
+                            AnalyticsService().track('search_suggestion_clicked', props: {'suggestion': s});
+                            _loadBrowseProducts();
+                          })).toList(),
                         ),
                       ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Image-led search will be enabled in an upcoming update.')),
+                              ),
+                              icon: const Icon(Icons.camera_alt_outlined),
+                              label: const Text('Upload photo'),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Voice search will be enabled in an upcoming update.')),
+                            ),
+                            icon: const Icon(Icons.mic_none),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        height: 40,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: _occasions
+                              .map((occasion) => Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: ChoiceChip(
+                                      label: Text(occasion),
+                                      selected: _selectedOccasion == occasion,
+                                      onSelected: (_) {
+                                        setState(() => _selectedOccasion = _selectedOccasion == occasion ? null : occasion);
+                                        AnalyticsService().track('occasion_chip_clicked', props: {'occasion': occasion});
+                                      },
+                                    ),
+                                  ))
+                              .toList(),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -483,6 +609,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               selected: {_selectedGender},
                               onSelectionChanged: (set) {
                                 setState(() => _selectedGender = set.first);
+                                _page = 1;
+                                AnalyticsService().track('gender_changed', props: {'gender': set.first});
                                 _loadBrowseProducts();
                               },
                             ),
@@ -527,16 +655,83 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _selectedCategoryName = name;
                                 }
                               });
+                              _page = 1;
+                              AnalyticsService().track('category_changed', props: {'category': _selectedCategoryName});
                               _loadBrowseProducts();
                             },
                           ),
                         )).toList(),
                       ),
                     ),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          DropdownButton<String>(
+                            value: _selectedSort,
+                            items: const [
+                              DropdownMenuItem(value: 'trending', child: Text('Trending')),
+                              DropdownMenuItem(value: 'fastest_delivery', child: Text('Fastest Delivery')),
+                              DropdownMenuItem(value: 'best_rated', child: Text('Best Rated')),
+                              DropdownMenuItem(value: 'price_low_to_high', child: Text('Price Low to High')),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() => _selectedSort = value);
+                              AnalyticsService().track('sort_changed', props: {'sort': value});
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
+                          FilterChip(
+                            label: const Text('Under ₹499'),
+                            selected: _maxPriceFilter == 499,
+                            onSelected: (selected) {
+                              setState(() => _maxPriceFilter = selected ? 499 : null);
+                              AnalyticsService().track('filter_applied', props: {'filter': 'max_price_499', 'selected': selected});
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
+                          FilterChip(
+                            label: const Text('30%+ Off'),
+                            selected: _minDiscountFilter == 30,
+                            onSelected: (selected) {
+                              setState(() => _minDiscountFilter = selected ? 30 : 0);
+                              AnalyticsService().track('filter_applied', props: {'filter': 'discount_30_plus', 'selected': selected});
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
+                          FilterChip(
+                            label: const Text('ETA < 30m'),
+                            selected: _etaUnder30Filter,
+                            onSelected: (selected) {
+                              setState(() => _etaUnder30Filter = selected);
+                              AnalyticsService().track('filter_applied', props: {'filter': 'eta_under_30', 'selected': selected});
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     ..._tagRowsForGender().map((row) => _SectionRow(
                           title: row['title'] as String,
                           products: _sectionProducts((row['keywords'] as List).map((e) => e.toString()).toList()),
                         )),
+                    if (_selectedOccasion != null)
+                      _SectionRow(title: '$_selectedOccasion Picks', products: _sectionProducts([_selectedOccasion!.toLowerCase()])),
+                    _SectionRow(title: 'Trending in your area', products: _browseProductsAsMap().take(8).toList()),
+                    _SectionRow(title: 'Selling fast near you', products: _browseProductsAsMap().reversed.take(8).toList()),
+                    _SectionRow(title: 'New arrivals today', products: _browseProductsAsMap().take(8).toList()),
+                    _SectionRow(title: 'Recently Dropped Prices', products: _recentlyDroppedPrices()),
+                    _SectionRow(title: 'Back in Stock for You', products: _backInStockProducts()),
                     if (_recentProducts.isNotEmpty) ...[
                       const Padding(
                         padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -599,19 +794,33 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Center(child: Text('No products found for current filters.')),
                       )
                     else
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.65,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
+                      Column(children: [
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.65,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                          itemCount: _browseProducts.length,
+                          itemBuilder: (context, index) => _ProductGridItem(product: _browseProducts[index]),
                         ),
-                        itemCount: _browseProducts.length,
-                        itemBuilder: (context, index) => _ProductGridItem(product: _browseProducts[index]),
-                      ),
+                        if (_hasMoreProducts)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: OutlinedButton(
+                              onPressed: _productLoading ? null : () {
+                                _page += 1;
+                                AnalyticsService().track('load_more_clicked', props: {'next_page': _page});
+                                _loadBrowseProducts();
+                              },
+                              child: const Text('Load more'),
+                            ),
+                          ),
+                      ]),
                     const SizedBox(height: 80),
                   ],
                 ),
@@ -725,7 +934,10 @@ class _ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final images = product['images'] as List? ?? [];
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/product', arguments: product['id']),
+      onTap: () {
+        AnalyticsService().track('product_clicked', props: {'productId': product['id'], 'surface': 'rail_card'});
+        Navigator.pushNamed(context, '/product', arguments: product['id']);
+      },
       child: Container(
         width: 160,
         margin: const EdgeInsets.only(right: 12),
@@ -781,7 +993,10 @@ class _ProductGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final images = product['images'] as List? ?? [];
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/product', arguments: product['id']),
+      onTap: () {
+        AnalyticsService().track('product_clicked', props: {'productId': product['id'], 'surface': 'browse_grid'});
+        Navigator.pushNamed(context, '/product', arguments: product['id']);
+      },
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -821,6 +1036,19 @@ class _ProductGridItem extends StatelessWidget {
                       Text('${double.parse(product['discount'].toString()).toStringAsFixed(0)}% off',
                           style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w500)),
                   ]),
+                  const SizedBox(height: 4),
+                  const Wrap(
+                    spacing: 4,
+                    runSpacing: -8,
+                    children: [
+                      Chip(label: Text('Easy returns', style: TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact),
+                      Chip(label: Text('Verified seller', style: TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact),
+                    ],
+                  ),
+                  Text(
+                    'Quick view: color/size options',
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                  ),
                 ],
               ),
             ),
