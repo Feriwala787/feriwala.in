@@ -46,11 +46,11 @@ class OfflineAction {
 }
 
 class OfflineActionQueueService {
-  OfflineActionQueueService._();
-  static final OfflineActionQueueService instance = OfflineActionQueueService._();
+  OfflineActionQueueService({DeliveryApiService? api}) : _api = api ?? DeliveryApiService();
+  static final OfflineActionQueueService instance = OfflineActionQueueService();
 
   static const _storageKey = 'delivery_offline_action_queue';
-  final DeliveryApiService _api = DeliveryApiService();
+  final DeliveryApiService _api;
   bool _isProcessing = false;
 
   Future<List<OfflineAction>> loadQueue() async {
