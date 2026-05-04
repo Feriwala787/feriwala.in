@@ -250,6 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Map<String, dynamic>> _applyLocalFilters(List<Map<String, dynamic>> items) {
+    final query = _searchController.text.trim().toLowerCase();
     var filtered = items.where((p) {
       final price = double.tryParse((p['price'] ?? '').toString()) ?? 0;
       final discount = double.tryParse((p['discountPercent'] ?? p['discount'] ?? '').toString()) ?? 0;
@@ -277,7 +278,25 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         break;
     }
+    if (query.isNotEmpty) {
+      filtered.sort((a, b) => _scoreSearchMatch(b, query).compareTo(_scoreSearchMatch(a, query)));
+    }
     return filtered;
+  }
+
+  int _scoreSearchMatch(Map<String, dynamic> product, String query) {
+    final name = (product['name'] ?? '').toString().toLowerCase();
+    final brand = (product['brand'] ?? '').toString().toLowerCase();
+    final category = (product['category']?['name'] ?? '').toString().toLowerCase();
+    final desc = (product['description'] ?? '').toString().toLowerCase();
+
+    int score = 0;
+    if (name.startsWith(query)) score += 50;
+    if (name.contains(query)) score += 35;
+    if (brand.contains(query)) score += 20;
+    if (category.contains(query)) score += 15;
+    if (desc.contains(query)) score += 10;
+    return score;
   }
 
   Future<void> _loadBrowseProducts() async {
@@ -405,6 +424,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final stock = int.tryParse((p['quantity'] ?? p['stock'] ?? '0').toString()) ?? 0;
       return stock > 0;
     }).take(10).toList();
+  }
+
+  List<Map<String, dynamic>> _becauseYouViewed() {
+    final recentIds = _recentProducts.map((e) => e['id']).whereType<int>().toSet();
+    if (recentIds.isEmpty) return [];
+    return _browseProductsAsMap().where((p) => !recentIds.contains(p['id'])).take(10).toList();
   }
 
   @override
@@ -803,6 +828,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _SectionRow(title: 'New arrivals today', products: _browseProductsAsMap().take(8).toList()),
                     _SectionRow(title: 'Recently Dropped Prices', products: _recentlyDroppedPrices()),
                     _SectionRow(title: 'Back in Stock for You', products: _backInStockProducts()),
+                    _SectionRow(title: 'Because you viewed', products: _becauseYouViewed()),
                     if (!_productLoading && _browseProducts.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(16),
