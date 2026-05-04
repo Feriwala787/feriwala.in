@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../utils/formatters.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -58,7 +59,7 @@ class CartScreen extends StatelessWidget {
                                     Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(fontWeight: FontWeight.w500)),
                                     const SizedBox(height: 4),
-                                    Text('INR ${item.price.toStringAsFixed(2)}',
+                                    Text(formatInr(item.price),
                                         style: const TextStyle(color: Color(0xFFF47721), fontWeight: FontWeight.bold)),
                                     if (item.size != null || item.color != null)
                                       Text('${item.size ?? ''} ${item.color ?? ''}'.trim(),
@@ -69,17 +70,29 @@ class CartScreen extends StatelessWidget {
                               // Quantity
                               Column(
                                 children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.add_circle, color: Color(0xFFF47721)),
-                                    onPressed: () => cart.updateQuantity(index, item.quantity + 1),
-                                    iconSize: 28,
+                                  Semantics(
+                                    button: true,
+                                    label: 'Increase quantity for ${item.name}',
+                                    child: IconButton(
+                                      icon: const Icon(Icons.add_circle, color: Color(0xFFF47721)),
+                                      onPressed: item.quantity >= 10 ? null : () => cart.updateQuantity(index, item.quantity + 1),
+                                      iconSize: 28,
+                                    ),
                                   ),
                                   Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                  IconButton(
-                                    icon: Icon(Icons.remove_circle,
-                                        color: item.quantity > 1 ? const Color(0xFFF47721) : Colors.red),
-                                    onPressed: () => cart.updateQuantity(index, item.quantity - 1),
-                                    iconSize: 28,
+                                  Semantics(
+                                    button: true,
+                                    label: 'Decrease quantity for ${item.name}',
+                                    child: IconButton(
+                                      icon: Icon(Icons.remove_circle,
+                                          color: item.quantity > 1 ? const Color(0xFFF47721) : Colors.red),
+                                      onPressed: () => cart.updateQuantity(index, item.quantity - 1),
+                                      iconSize: 28,
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => cart.moveToSaved(index),
+                                    child: const Text('Save'),
                                   ),
                                 ],
                               ),
@@ -110,8 +123,18 @@ class CartScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Subtotal'),
-                          Text('INR ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                          Text(formatInr(cart.subtotal), style: const TextStyle(fontWeight: FontWeight.w500)),
                         ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [const Text('Delivery Fee'), Text(formatInr(30))],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [const Text('Taxes (5%)'), Text(formatInr(cart.subtotal * 0.05))],
                       ),
                       if (cart.discount > 0) ...[
                         const SizedBox(height: 4),
@@ -119,7 +142,7 @@ class CartScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('Discount (${cart.promoCode})', style: const TextStyle(color: Colors.green)),
-                            Text('-INR ${cart.discount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
+                            Text('-${formatInr(cart.discount)}', style: const TextStyle(color: Colors.green)),
                           ],
                         ),
                       ],
@@ -128,7 +151,7 @@ class CartScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          Text('INR ${cart.total.toStringAsFixed(2)}',
+                          Text(formatInr(cart.total + 30 + cart.subtotal * 0.05),
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                         ],
                       ),
@@ -149,6 +172,26 @@ class CartScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (cart.savedItems.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Saved for later', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        ...cart.savedItems.asMap().entries.map((entry) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(entry.value.name),
+                          subtitle: Text(formatInr(entry.value.price)),
+                          trailing: OutlinedButton(
+                            onPressed: () => cart.moveToCartFromSaved(entry.key),
+                            child: const Text('Move to cart'),
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
               ],
             ),
     );
