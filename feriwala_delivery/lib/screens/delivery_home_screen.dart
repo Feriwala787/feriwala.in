@@ -89,7 +89,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                   await auth.toggleOnline();
                   _pushLocationIfOnline();
                 },
-                activeThumbColor: Colors.green,
+                activeColor: Colors.green,
               ),
             ],
           ),

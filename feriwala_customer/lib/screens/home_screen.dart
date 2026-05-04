@@ -525,7 +525,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               const Text('No nearby warehouses found.'),
                             if (_nearbyWarehouses.isNotEmpty)
                               DropdownButtonFormField<int>(
-                                initialValue: (_selectedWarehouse?['id'] as num?)?.toInt(),
+                                value: (_selectedWarehouse?['id'] as num?)?.toInt(),
                                 decoration: const InputDecoration(labelText: 'Selected Warehouse'),
                                 items: _nearbyWarehouses
                                     .map((w) => DropdownMenuItem<int>(
@@ -998,13 +998,6 @@ class _SectionRow extends StatelessWidget {
   const _SectionRow({required this.title, required this.products});
 
   @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     if (products.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -1033,13 +1026,6 @@ class _CategoryTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   const _CategoryTile({required this.category, required this.selected, required this.onTap});
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1075,13 +1061,6 @@ class _CategoryTile extends StatelessWidget {
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductCard({required this.product});
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1141,13 +1120,6 @@ class _ProductCard extends StatelessWidget {
 class _ProductGridItem extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductGridItem({required this.product});
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {

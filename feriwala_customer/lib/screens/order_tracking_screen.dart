@@ -151,7 +151,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<int>(
-                  initialValue: selectedItemId,
+                  value: selectedItemId,
                   decoration: const InputDecoration(labelText: 'Select item'),
                   items: items
                       .map((item) => DropdownMenuItem<int>(
@@ -163,7 +163,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  initialValue: returnType,
+                  value: returnType,
                   decoration: const InputDecoration(labelText: 'Request type'),
                   items: const [
                     DropdownMenuItem(value: 'return', child: Text('Return (refund to bank)')),
@@ -179,7 +179,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  initialValue: selectedReason,
+                  value: selectedReason,
                   decoration: const InputDecoration(labelText: 'Reason category'),
                   items: const [
                     DropdownMenuItem(value: 'Damaged item', child: Text('Damaged item')),
@@ -191,7 +191,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  initialValue: pickupSlot,
+                  value: pickupSlot,
                   decoration: const InputDecoration(labelText: 'Preferred pickup slot'),
                   items: const [
                     DropdownMenuItem(value: 'Tomorrow (10 AM - 1 PM)', child: Text('Tomorrow (10 AM - 1 PM)')),
