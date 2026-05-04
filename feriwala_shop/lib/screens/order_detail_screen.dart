@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'shop_receipt_screen.dart';
 
 class ShopOrderDetailScreen extends StatefulWidget {
   final int orderId;
@@ -159,6 +160,13 @@ class _ShopOrderDetailScreenState extends State<ShopOrderDetailScreen> {
                               leading: const Icon(Icons.receipt, color: Colors.green),
                               title: Text('Invoice: ${_order!['invoice']['invoiceNumber']}'),
                               subtitle: Text('INR ${_order!['invoice']['total']}'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ShopReceiptScreen(order: _order!),
+                                ),
+                              ),
                             ),
                           ),
                         ),

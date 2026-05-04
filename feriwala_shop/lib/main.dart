@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'services/error_reporter.dart';
+import 'services/required_permissions_service.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'providers/shop_auth_provider.dart';
@@ -13,6 +14,8 @@ import 'screens/shop_promos_screen.dart';
 import 'screens/shop_inventory_screen.dart';
 import 'screens/delivery_management_screen.dart';
 import 'screens/shop_returns_screen.dart';
+import 'screens/notification_preferences_screen.dart';
+import 'screens/shop_insights_screen.dart';
 
 int? _parseRouteInt(Object? value) {
   if (value is int) return value;
@@ -45,6 +48,8 @@ void main() async {
   };
 
   try {
+    await RequiredPermissionsService().requestStartupPermissions();
+
     await ShopApiService().init();
   } catch (error, stackTrace) {
     ErrorReporter.report(error, stackTrace, context: 'api-init');
@@ -87,6 +92,8 @@ class FeriwalaShopApp extends StatelessWidget {
           '/inventory': (context) => const ShopInventoryScreen(),
           '/delivery': (context) => const DeliveryManagementScreen(),
           '/returns': (context) => const ShopReturnsScreen(),
+          '/notifications': (context) => const NotificationPreferencesScreen(),
+          '/insights': (context) => const ShopInsightsScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/order-detail') {
