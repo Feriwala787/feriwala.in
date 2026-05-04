@@ -196,6 +196,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return pincode.length == 6;
   }
 
+  Future<bool> _validateServiceability(Map<String, dynamic> address) async {
+    final cart = context.read<CartProvider>();
+    if (cart.shopId == null) return false;
+    try {
+      await ApiService().post('/orders/serviceability', body: {
+        'shopId': cart.shopId,
+        'deliveryAddress': address,
+      });
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(mapApiError(e)), backgroundColor: Colors.orange),
+        );
+      }
+      return false;
+    }
+  }
+
   Future<bool> _validateCartBeforeOrder() async {
     final cart = context.read<CartProvider>();
     for (final item in cart.items) {
@@ -232,6 +251,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address pincode is not serviceable yet.')));
       return;
     }
+    final serviceable = await _validateServiceability(selectedAddress);
+    if (!serviceable) return;
 
     final isValidCart = await _validateCartBeforeOrder();
     if (!isValidCart) { AnalyticsService().track('place_order_blocked_validation'); return; }

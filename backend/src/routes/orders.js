@@ -15,6 +15,56 @@ const { generateOrderNumber, generateInvoiceNumber, generateOtp } = require('../
 const { Op } = require('sequelize');
 const { createOrAssignDeliveryTask } = require('../services/deliveryTaskService');
 
+// Check delivery serviceability (customer)
+router.post('/serviceability', authenticate, authorize('customer'), [
+  body('shopId').isInt(),
+  body('deliveryAddress').isObject(),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { shopId, deliveryAddress } = req.body;
+    const shop = await Shop.findByPk(shopId);
+    if (!shop || !shop.isActive) {
+      return res.status(400).json({ success: false, message: 'Shop not available' });
+    }
+
+    const pincode = (deliveryAddress?.pincode || '').toString().trim();
+    if (pincode.length !== 6) {
+      return res.status(400).json({ success: false, message: 'Invalid pincode' });
+    }
+
+    const radiusKm = Number(shop.deliveryRadiusKm || 0);
+    const hasGeo = shop.latitude && shop.longitude && deliveryAddress?.latitude && deliveryAddress?.longitude;
+    if (radiusKm > 0 && hasGeo) {
+      const toRad = (deg) => (deg * Math.PI) / 180;
+      const R = 6371;
+      const dLat = toRad(Number(deliveryAddress.latitude) - Number(shop.latitude));
+      const dLon = toRad(Number(deliveryAddress.longitude) - Number(shop.longitude));
+      const lat1 = toRad(Number(shop.latitude));
+      const lat2 = toRad(Number(deliveryAddress.latitude));
+      const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distanceKm = R * c;
+      if (distanceKm > radiusKm) {
+        return res.status(400).json({
+          success: false,
+          message: `Delivery address is outside serviceable radius (${radiusKm} km)`,
+          data: { distanceKm: Number(distanceKm.toFixed(2)), radiusKm },
+        });
+      }
+      return res.json({ success: true, data: { serviceable: true, distanceKm: Number(distanceKm.toFixed(2)), radiusKm } });
+    }
+
+    return res.json({ success: true, data: { serviceable: true } });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
 
 // Quote order totals (customer)
 router.post('/quote', authenticate, authorize('customer'), [
