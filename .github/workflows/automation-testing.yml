@@ -94,9 +94,19 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Static analysis (non-blocking)
+      - name: Static analysis
         run: flutter analyze
-        continue-on-error: true
 
       - name: Run tests
         run: flutter test
+
+  required-quality-gate:
+    name: Required Quality Gate
+    runs-on: ubuntu-latest
+    needs:
+      - backend-tests
+      - admin-portal-tests
+      - flutter-tests
+    steps:
+      - name: All required checks passed
+        run: echo "Required checks passed: backend, admin portal, flutter analyze + test"
