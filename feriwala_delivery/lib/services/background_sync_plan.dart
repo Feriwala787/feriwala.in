@@ -8,5 +8,5 @@
 /// This placeholder keeps the strategy documented near services until platform-specific
 /// implementation is introduced in dedicated files.
 class BackgroundSyncPlan {
-  static const bool platformBackgroundSyncEnabled = false;
+  static const bool platformBackgroundSyncEnabled = true;
 }
