@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
+import '../utils/api_error_mapper.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -28,7 +30,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { _loadActivePromos(); _loadQuote(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) { _loadActivePromos(); _loadQuote(); AnalyticsService().track('begin_checkout'); });
   }
 
   Future<void> _loadActivePromos() async {
@@ -61,6 +63,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() => _quote = res['data']);
     } catch (_) {
       setState(() => _quote = null);
+      AnalyticsService().track('checkout_quote_failed');
     } finally {
       if (mounted) setState(() => _quoteLoading = false);
     }
@@ -231,8 +234,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     final isValidCart = await _validateCartBeforeOrder();
-    if (!isValidCart) return;
+    if (!isValidCart) { AnalyticsService().track('place_order_blocked_validation'); return; }
 
+    AnalyticsService().track('place_order_attempt', props: {'paymentMethod': _paymentMethod});
     setState(() => _placing = true);
     try {
       final address = addresses[_selectedAddressIndex];
@@ -247,6 +251,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             if (cart.promoCode != null) 'promoCode': cart.promoCode,
           });
 
+      AnalyticsService().track('place_order_success');
       cart.clearCart();
       _clientOrderId = DateTime.now().millisecondsSinceEpoch.toString();
       if (!mounted) return;
@@ -254,7 +259,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       Navigator.pushNamed(context, '/order-tracking', arguments: res['data']['id']);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+        AnalyticsService().track('place_order_failed');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mapApiError(e)), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _placing = false);
@@ -277,6 +283,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         currentStep: _step,
         onStepContinue: () {
           if (_step < 3) {
+            AnalyticsService().track('checkout_step_continue', props: {'step': _step});
             setState(() => _step += 1);
           } else {
             _placeOrder();
@@ -303,7 +310,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         await context.read<CartProvider>().applyPromo((promo['code'] ?? '').toString());
                         if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Promo applied'))); _loadQuote(); }
                       } catch (e) {
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mapApiError(e))));
                       }
                     },
                   )).toList(),
