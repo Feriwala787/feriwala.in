@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/offline_action_queue_service.dart';
+import '../services/operation_audit_service.dart';
 import '../services/shop_socket_service.dart';
 import '../services/security_guard_service.dart';
 
@@ -55,6 +56,7 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
 
   Future<void> _syncOfflineQueue() async {
     final synced = await OfflineActionQueueService().processQueue();
+    await OperationAuditService().log(action: 'offline_queue_sync', status: 'success', detail: 'synced=$synced');
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Synced $synced offline action(s).')));
     _refreshPendingQueueCount();
@@ -119,6 +121,7 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
   Future<void> _updateStatus(int orderId, String newStatus) async {
     try {
       await ShopApiService().put('/orders/$orderId/status', body: {'status': newStatus});
+      await OperationAuditService().log(action: 'order_status_update', status: 'success', detail: 'orderId=$orderId status=$newStatus');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Order $newStatus'), backgroundColor: Colors.green),
@@ -129,6 +132,7 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
         endpoint: '/orders/$orderId/status',
         body: {'status': newStatus},
       );
+      await OperationAuditService().log(action: 'order_status_update', status: 'queued', detail: 'orderId=$orderId status=$newStatus');
       if (!mounted) return;
       _refreshPendingQueueCount();
       ScaffoldMessenger.of(context).showSnackBar(
