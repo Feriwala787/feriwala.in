@@ -23,6 +23,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String? _selectedSize;
   String? _selectedColor;
   int _selectedImageIndex = 0;
+  final PageController _pageController = PageController();
 
   Map<String, dynamic> get _attributes {
     final raw = _product?['attributes'];
@@ -94,6 +95,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return (int.tryParse(_variantStock[key].toString()) ?? 0) > 0;
   }
 
+  void _ensureValidVariantSelection() {
+    if (_selectedSize == null || _selectedColor == null || _variantStock.isEmpty) return;
+    if (_isVariantSelectable(_selectedSize!, _selectedColor!)) return;
+    for (final c in _availableColors) {
+      if (_isVariantSelectable(_selectedSize!, c)) {
+        _selectedColor = c;
+        return;
+      }
+    }
+    for (final s in _availableSizes) {
+      if (_isVariantSelectable(s, _selectedColor!)) {
+        _selectedSize = s;
+        return;
+      }
+    }
+  }
+
+  String _variantFallbackHint() {
+    if (_selectedSize == null || _selectedColor == null) return '';
+    if (_isVariantSelectable(_selectedSize!, _selectedColor!)) return '';
+    final altSize = _availableSizes.where((s) => _isVariantSelectable(s, _selectedColor!)).cast<String?>().firstWhere((e) => e != null, orElse: () => null);
+    final altColor = _availableColors.where((c) => _isVariantSelectable(_selectedSize!, c)).cast<String?>().firstWhere((e) => e != null, orElse: () => null);
+    if (altSize != null) return 'Try size $altSize in $_selectedColor';
+    if (altColor != null) return 'Try $_selectedSize in color $altColor';
+    return 'Selected combination is unavailable.';
+  }
+
   double _selectedVariantPrice() {
     if (_selectedSize != null && _selectedColor != null && _variantPrices.isNotEmpty) {
       final key = '${_selectedSize!}__${_selectedColor!}';
@@ -107,6 +135,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     _loadProduct();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> _saveRecentlyViewed() async {
@@ -204,10 +238,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                              SizedBox(
+                      SizedBox(
                         height: 350,
                         child: (_product!['images'] as List?)?.isNotEmpty == true
                             ? PageView.builder(
+                                controller: _pageController,
                                 itemCount: (_product!['images'] as List).length,
                                 onPageChanged: (i) => setState(() => _selectedImageIndex = i),
                                 itemBuilder: (context, i) => Image.network(
@@ -290,7 +325,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   return ChoiceChip(
                                     label: Text(disabled ? '$size (Out)' : size),
                                     selected: _selectedSize == size,
-                                    onSelected: disabled ? null : (_) => setState(() { _selectedSize = size; AnalyticsService().track('pdp_size_selected', props: {'size': size}); }),
+                                    onSelected: disabled ? null : (_) => setState(() { _selectedSize = size; _ensureValidVariantSelection(); AnalyticsService().track('pdp_size_selected', props: {'size': size}); }),
                                   );
                                 }).toList(),
                               ),
@@ -337,12 +372,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     onSelected: selectable
                                         ? (_) => setState(() {
                                               _selectedColor = color;
+                                              _ensureValidVariantSelection();
                                               AnalyticsService().track('pdp_color_selected', props: {'color': color});
                                               final colorImage = _colorImages[color];
                                               final images = (_product!['images'] as List?) ?? [];
                                               if (colorImage != null) {
                                                 final idx = images.indexWhere((img) => img.toString() == colorImage.toString());
-                                                if (idx >= 0) _selectedImageIndex = idx;
+                                                if (idx >= 0) {
+                                                  _selectedImageIndex = idx;
+                                                  _pageController.animateToPage(idx, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                                }
                                               }
                                             })
                                         : null,
@@ -353,6 +392,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ],
                             Text(selectedStock > 0 ? 'In Stock: $selectedStock' : 'Out of Stock',
                                 style: TextStyle(color: selectedStock > 0 ? Colors.green : Colors.red)),
+                            if (_variantFallbackHint().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(_variantFallbackHint(), style: const TextStyle(fontSize: 12, color: Colors.orange)),
+                              ),
                             const SizedBox(height: 16),
                             if ((_product!['shortDescription'] ?? '').toString().isNotEmpty) ...[
                               Text(_product!['shortDescription'], style: const TextStyle(fontSize: 14, color: Colors.black87)),
