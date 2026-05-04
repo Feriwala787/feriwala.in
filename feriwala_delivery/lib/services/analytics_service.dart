@@ -43,4 +43,11 @@ class AnalyticsService {
       await prefs.setString(_eventsKey, jsonEncode(remaining));
     }
   }
+
+  Future<int> pendingCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_eventsKey);
+    if (raw == null || raw.isEmpty) return 0;
+    return (jsonDecode(raw) as List<dynamic>).length;
+  }
 }

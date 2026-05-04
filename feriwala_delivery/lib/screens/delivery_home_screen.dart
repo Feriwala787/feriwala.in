@@ -501,6 +501,12 @@ class _ProfileTab extends StatelessWidget {
           ),
           const Divider(),
           ListTile(
+            leading: const Icon(Icons.bug_report),
+            title: const Text('Diagnostics'),
+            onTap: () => Navigator.pushNamed(context, '/diagnostics'),
+          ),
+          const Divider(),
+          ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text('Logout', style: TextStyle(color: Colors.red)),
             onTap: () async {

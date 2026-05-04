@@ -12,6 +12,7 @@ import 'screens/delivery_home_screen.dart';
 import 'screens/task_detail_screen.dart';
 import 'screens/return_verification_screen.dart';
 import 'screens/delivery_profile_screen.dart';
+import 'screens/delivery_diagnostics_screen.dart';
 
 int? _parseRouteInt(Object? value) {
   if (value is int) return value;
@@ -86,6 +87,7 @@ class FeriwalaDeliveryApp extends StatelessWidget {
           '/login': (context) => const DeliveryLoginScreen(),
           '/home': (context) => const DeliveryHomeScreen(),
           '/profile': (context) => const DeliveryProfileScreen(),
+          '/diagnostics': (context) => const DeliveryDiagnosticsScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/task-detail') {
