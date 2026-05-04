@@ -390,8 +390,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                               const SizedBox(height: 8),
                             ],
-                            Text(selectedStock > 0 ? 'In Stock: $selectedStock' : 'Out of Stock',
-                                style: TextStyle(color: selectedStock > 0 ? Colors.green : Colors.red)),
+                            Text(
+                              selectedStock <= 0
+                                  ? 'Out of Stock'
+                                  : selectedStock <= 5
+                                      ? 'Only $selectedStock left'
+                                      : 'In Stock: $selectedStock',
+                              style: TextStyle(color: selectedStock > 0 ? Colors.green : Colors.red),
+                            ),
                             if (_variantFallbackHint().isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
@@ -510,6 +516,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             )
           : null,
+      persistentFooterButtons: _product == null ? null : [
+        Text(
+          'Selected: ${_selectedSize ?? '-'} • ${_selectedColor ?? '-'} • Qty $_quantity',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        Text(
+          'Estimated payable: INR ${(selectedPrice * _quantity).toStringAsFixed(2)} + delivery',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+      ],
     );
   }
 }

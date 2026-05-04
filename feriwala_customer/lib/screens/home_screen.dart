@@ -1154,6 +1154,8 @@ class _ProductGridItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final images = product['images'] as List? ?? [];
+    final sizes = (product['size'] ?? '').toString().split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(2).toList();
+    final colors = (product['color'] ?? '').toString().split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(2).toList();
     return GestureDetector(
       onTap: () {
         AnalyticsService().track('product_clicked', props: {'productId': product['id'], 'surface': 'browse_grid'});
@@ -1199,6 +1201,15 @@ class _ProductGridItem extends StatelessWidget {
                           style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w500)),
                   ]),
                   const SizedBox(height: 4),
+                  if (sizes.isNotEmpty || colors.isNotEmpty)
+                    Wrap(
+                      spacing: 4,
+                      children: [
+                        ...sizes.map((s) => Chip(label: Text(s, style: const TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact)),
+                        ...colors.map((c) => Chip(label: Text(c, style: const TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact)),
+                      ],
+                    ),
+                  const SizedBox(height: 4),
                   const Wrap(
                     spacing: 4,
                     runSpacing: -8,
@@ -1210,6 +1221,17 @@ class _ProductGridItem extends StatelessWidget {
                   Text(
                     'Quick view: color/size options',
                     style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        AnalyticsService().track('quick_add_clicked', props: {'productId': product['id']});
+                        Navigator.pushNamed(context, '/product', arguments: product['id']);
+                      },
+                      child: const Text('Quick Add'),
+                    ),
                   ),
                 ],
               ),
