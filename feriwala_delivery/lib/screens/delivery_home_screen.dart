@@ -259,12 +259,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
                 activeThumbColor: Colors.green,
               ),
               if (_queuedActionCount > 0)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Center(
-                    child: Text('Queued: $_queuedActionCount', style: const TextStyle(fontSize: 11, color: Colors.orange)),
-                  ),
-                ),
+                QueuedActionBadge(count: _queuedActionCount),
               IconButton(
                 tooltip: 'Refresh tasks',
                 onPressed: () => _loadTasks(showLoader: false),
@@ -281,7 +276,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
           _loading
               ? const Center(child: CircularProgressIndicator())
               : _loadError != null
-                  ? _ErrorState(message: _loadError!, onRetry: _loadTasks)
+                  ? DeliveryErrorState(message: _loadError!, onRetry: _loadTasks)
               : RefreshIndicator(
                   onRefresh: _loadTasks,
                   child: _activeTasks.isEmpty
@@ -314,7 +309,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
                       : ListView.builder(
                           padding: const EdgeInsets.all(12),
                           itemCount: _activeTasks.length,
-                          itemBuilder: (context, index) => _TaskCard(
+                          itemBuilder: (context, index) => TaskCard(
                             task: _activeTasks[index],
                             onTap: () async {
                               await Navigator.pushNamed(context, '/task-detail', arguments: _activeTasks[index]['id']);
@@ -346,7 +341,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
                       : ListView.builder(
                           padding: const EdgeInsets.all(12),
                           itemCount: _completedTasks.length,
-                          itemBuilder: (context, index) => _TaskCard(task: _completedTasks[index], onTap: () {}),
+                          itemBuilder: (context, index) => TaskCard(task: _completedTasks[index], onTap: () {}),
                         ),
                 ),
 
@@ -367,13 +362,13 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
   }
 }
 
-class _TaskCard extends StatelessWidget {
+class TaskCard extends StatelessWidget {
   final Map<String, dynamic> task;
   final VoidCallback onTap;
   final VoidCallback? onAccept;
   final VoidCallback? onNavigate;
   final bool isAccepting;
-  const _TaskCard({required this.task, required this.onTap, this.onAccept, this.onNavigate, this.isAccepting = false});
+  const TaskCard({required this.task, required this.onTap, this.onAccept, this.onNavigate, this.isAccepting = false});
 
   @override
   Widget build(BuildContext context) {
@@ -515,10 +510,25 @@ class _ProfileTab extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
+class QueuedActionBadge extends StatelessWidget {
+  final int count;
+  const QueuedActionBadge({super.key, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Center(
+        child: Text('Queued: $count', style: const TextStyle(fontSize: 11, color: Colors.orange)),
+      ),
+    );
+  }
+}
+
+class DeliveryErrorState extends StatelessWidget {
   final String message;
   final Future<void> Function() onRetry;
-  const _ErrorState({required this.message, required this.onRetry});
+  const DeliveryErrorState({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
