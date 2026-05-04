@@ -5,6 +5,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/delivery_auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/offline_action_queue_service.dart';
+import '../services/realtime_task_service.dart';
+import '../services/analytics_service.dart';
+import '../services/token_storage_service.dart';
 
 class DeliveryHomeScreen extends StatefulWidget {
   const DeliveryHomeScreen({super.key});
@@ -22,6 +26,8 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
   String? _loadError;
   DateTime? _lastSyncedAt;
   int _currentIndex = 0;
+  int _queuedActionCount = 0;
+  int _lastTaskSequence = 0;
   Timer? _locationSyncTimer;
   Timer? _taskPollingTimer;
   final Set<int> _acceptingTaskIds = <int>{};
@@ -36,6 +42,8 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
     _loadTasks();
     _startLocationSync();
     _startTaskPolling();
+    _initRealtimeSync();
+    _refreshQueuedActionCount();
   }
 
   @override
@@ -43,6 +51,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
     WidgetsBinding.instance.removeObserver(this);
     _locationSyncTimer?.cancel();
     _taskPollingTimer?.cancel();
+    RealtimeTaskService.instance.disconnect();
     super.dispose();
   }
 
@@ -54,10 +63,37 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
     }
   }
 
+
+  Future<void> _initRealtimeSync() async {
+    final token = await TokenStorageService.instance.readAccessToken();
+    if (token == null) return;
+
+    RealtimeTaskService.instance.connect(
+      token: token,
+      onTaskEvent: (sequence) {
+        if (sequence != null && sequence < _lastTaskSequence) return;
+        if (sequence != null) _lastTaskSequence = sequence;
+        _loadTasks(showLoader: false);
+      },
+    );
+  }
+
+  Future<void> _refreshQueuedActionCount() async {
+    final count = await OfflineActionQueueService.instance.pendingCount();
+    if (mounted) setState(() => _queuedActionCount = count);
+  }
+
+  Future<void> _processOfflineQueueIfOnline() async {
+    if (!context.read<DeliveryAuthProvider>().isOnline) return;
+    await OfflineActionQueueService.instance.processQueue();
+    await _refreshQueuedActionCount();
+  }
+
   void _startTaskPolling() {
     _taskPollingTimer?.cancel();
     _taskPollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (context.read<DeliveryAuthProvider>().isOnline) {
+        _processOfflineQueueIfOnline();
         _loadTasks(showLoader: false);
       }
     });
@@ -82,13 +118,19 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
 
+    final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
     try {
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       await _apiService.put('/delivery/location', body: {
         'latitude': pos.latitude,
         'longitude': pos.longitude,
       });
-    } catch (_) {}
+    } catch (_) {
+      await OfflineActionQueueService.instance.enqueuePut(
+        endpoint: '/delivery/location',
+        body: {'latitude': pos.latitude, 'longitude': pos.longitude},
+      );
+      await _refreshQueuedActionCount();
+    }
   }
 
   void _splitTasks(List<dynamic> tasks) {
@@ -132,7 +174,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
       if (mounted) {
         setState(() {
           _loading = false;
-          _loadError = e.toString();
+          _loadError = 'Unable to refresh tasks. Please try again.';
         });
       }
     } finally {
@@ -149,18 +191,27 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
 
     setState(() => _acceptingTaskIds.add(taskId));
     try {
-      await _apiService.put('/delivery/tasks/$taskId/accept');
+      final idempotencyKey = 'accept-$taskId-${DateTime.now().millisecondsSinceEpoch}';
+      await _apiService.put('/delivery/tasks/$taskId/accept', extraHeaders: {'X-Idempotency-Key': idempotencyKey});
       await _loadTasks(showLoader: false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Task accepted successfully.')),
         );
+        AnalyticsService.instance.track('task_accept_success', props: {'taskId': taskId});
       }
     } catch (e) {
+      await OfflineActionQueueService.instance.enqueuePut(
+        endpoint: '/delivery/tasks/$taskId/accept',
+        body: const {},
+        id: 'accept-$taskId',
+      );
+      await _refreshQueuedActionCount();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          const SnackBar(content: Text('Network issue: action queued and will retry automatically.')),
         );
+        AnalyticsService.instance.track('task_accept_queued', props: {'taskId': taskId});
       }
     } finally {
       if (mounted) {
@@ -211,6 +262,8 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
                 },
                 activeColor: Colors.green,
               ),
+              if (_queuedActionCount > 0)
+                QueuedActionBadge(count: _queuedActionCount),
               IconButton(
                 tooltip: 'Refresh tasks',
                 onPressed: () => _loadTasks(showLoader: false),
@@ -227,7 +280,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
           _loading
               ? const Center(child: CircularProgressIndicator())
               : _loadError != null
-                  ? _ErrorState(message: _loadError!, onRetry: _loadTasks)
+                  ? DeliveryErrorState(message: _loadError!, onRetry: _loadTasks)
               : RefreshIndicator(
                   onRefresh: _loadTasks,
                   child: _activeTasks.isEmpty
@@ -260,7 +313,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
                       : ListView.builder(
                           padding: const EdgeInsets.all(12),
                           itemCount: _activeTasks.length,
-                          itemBuilder: (context, index) => _TaskCard(
+                          itemBuilder: (context, index) => TaskCard(
                             task: _activeTasks[index],
                             onTap: () async {
                               await Navigator.pushNamed(context, '/task-detail', arguments: _activeTasks[index]['id']);
@@ -292,7 +345,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
                       : ListView.builder(
                           padding: const EdgeInsets.all(12),
                           itemCount: _completedTasks.length,
-                          itemBuilder: (context, index) => _TaskCard(task: _completedTasks[index], onTap: () {}),
+                          itemBuilder: (context, index) => TaskCard(task: _completedTasks[index], onTap: () {}),
                         ),
                 ),
 
@@ -313,13 +366,13 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
   }
 }
 
-class _TaskCard extends StatelessWidget {
+class TaskCard extends StatelessWidget {
   final Map<String, dynamic> task;
   final VoidCallback onTap;
   final VoidCallback? onAccept;
   final VoidCallback? onNavigate;
   final bool isAccepting;
-  const _TaskCard({required this.task, required this.onTap, this.onAccept, this.onNavigate, this.isAccepting = false});
+  const TaskCard({required this.task, required this.onTap, this.onAccept, this.onNavigate, this.isAccepting = false});
 
   @override
   Widget build(BuildContext context) {
@@ -448,6 +501,12 @@ class _ProfileTab extends StatelessWidget {
           ),
           const Divider(),
           ListTile(
+            leading: const Icon(Icons.bug_report),
+            title: const Text('Diagnostics'),
+            onTap: () => Navigator.pushNamed(context, '/diagnostics'),
+          ),
+          const Divider(),
+          ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text('Logout', style: TextStyle(color: Colors.red)),
             onTap: () async {
@@ -461,10 +520,25 @@ class _ProfileTab extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
+class QueuedActionBadge extends StatelessWidget {
+  final int count;
+  const QueuedActionBadge({super.key, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Center(
+        child: Text('Queued: $count', style: const TextStyle(fontSize: 11, color: Colors.orange)),
+      ),
+    );
+  }
+}
+
+class DeliveryErrorState extends StatelessWidget {
   final String message;
   final Future<void> Function() onRetry;
-  const _ErrorState({required this.message, required this.onRetry});
+  const DeliveryErrorState({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {

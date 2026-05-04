@@ -191,15 +191,6 @@ class _ShopInventoryScreenState extends State<ShopInventoryScreen> {
         title: const Text('Inventory'),
         actions: [
           IconButton(onPressed: _restockLowStockQueue, icon: const Icon(Icons.playlist_add_check), tooltip: 'One-click restock plan'),
-          IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('CSV import/update scaffold ready (backend upload endpoint required).')),
-              );
-            },
-            icon: const Icon(Icons.upload_file),
-            tooltip: 'CSV bulk import',
-          ),
         ],
       ),
       body: _loading

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'token_storage_service.dart';
+import 'error_reporter.dart';
+import 'security_posture_service.dart';
 
 class DeliveryApiService {
   static final DeliveryApiService _instance = DeliveryApiService._internal();
@@ -11,8 +13,7 @@ class DeliveryApiService {
   String? _token;
 
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('delivery_access_token');
+    _token = await TokenStorageService.instance.readAccessToken();
   }
 
   Map<String, String> get _headers => {
@@ -22,21 +23,17 @@ class DeliveryApiService {
 
   Future<void> setToken(String token) async {
     _token = token;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('delivery_access_token', token);
+    await TokenStorageService.instance.writeAccessToken(token);
   }
 
   Future<void> clearToken() async {
     _token = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('delivery_access_token');
-    await prefs.remove('delivery_refresh_token');
+    await TokenStorageService.instance.clearTokens();
   }
 
   Future<bool> _tryRefreshToken() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final refreshToken = prefs.getString('delivery_refresh_token');
+      final refreshToken = await TokenStorageService.instance.readRefreshToken();
       if (refreshToken == null) return false;
 
       final response = await http.post(
@@ -53,7 +50,7 @@ class DeliveryApiService {
 
       await setToken(accessToken.toString());
       if (newRefreshToken != null) {
-        await prefs.setString('delivery_refresh_token', newRefreshToken.toString());
+        await TokenStorageService.instance.writeRefreshToken(newRefreshToken.toString());
       }
       return true;
     } catch (_) {
@@ -63,6 +60,9 @@ class DeliveryApiService {
 
   Future<Map<String, dynamic>> _requestWithAutoRefresh(
       Future<http.Response> Function() requestFn) async {
+    if (!SecurityPostureService.instance.allowSensitiveNetworkCalls) {
+      throw Exception('Security posture check failed');
+    }
     final response = await requestFn();
     if (response.statusCode != 401) return _handleResponse(response);
 
@@ -80,19 +80,19 @@ class DeliveryApiService {
   }
 
   Future<Map<String, dynamic>> post(String endpoint,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, Map<String, String>? extraHeaders}) async {
     return _requestWithAutoRefresh(() => http.post(
           Uri.parse('$baseUrl$endpoint'),
-          headers: _headers,
+          headers: {..._headers, ...?extraHeaders},
           body: jsonEncode(body),
         ));
   }
 
   Future<Map<String, dynamic>> put(String endpoint,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, Map<String, String>? extraHeaders}) async {
     return _requestWithAutoRefresh(() => http.put(
           Uri.parse('$baseUrl$endpoint'),
-          headers: _headers,
+          headers: {..._headers, ...?extraHeaders},
           body: jsonEncode(body),
         ));
   }
@@ -100,6 +100,7 @@ class DeliveryApiService {
   Map<String, dynamic> _handleResponse(http.Response response) {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode >= 200 && response.statusCode < 300) return data;
+    ErrorReporter.message('API error ${response.statusCode}: ${data['message'] ?? 'Request failed'}');
     throw Exception(data['message'] ?? 'Request failed');
   }
 }

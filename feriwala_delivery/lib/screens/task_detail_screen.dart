@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
+import '../services/analytics_service.dart';
 
 class TaskDetailScreen extends StatefulWidget {
   final int taskId;
@@ -13,6 +14,7 @@ class TaskDetailScreen extends StatefulWidget {
 class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Map<String, dynamic>? _task;
   bool _loading = true;
+  bool _updatingStatus = false;
   final _otpController = TextEditingController();
 
   @override
@@ -33,14 +35,38 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _updateStatus(String status, {String? otp}) async {
+    if (_updatingStatus || _task == null) return;
+    final currentStatus = _task!['status']?.toString() ?? '';
+    final allowedTransitions = {
+      'accepted': {'picking'},
+      'picking': {'picked_up'},
+      'picked_up': {'in_transit', 'completed'},
+      'in_transit': {'completed'},
+    };
+
+    if (!(allowedTransitions[currentStatus]?.contains(status) ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid status transition. Refresh and try again.')),
+      );
+      return;
+    }
+
+    setState(() => _updatingStatus = true);
     try {
       final body = <String, dynamic>{'status': status};
       if (otp != null) body['otp'] = otp;
-      await DeliveryApiService().put('/delivery/tasks/${widget.taskId}/status', body: body);
+      await DeliveryApiService().put(
+        '/delivery/tasks/${widget.taskId}/status',
+        body: body,
+        extraHeaders: {'X-Idempotency-Key': 'status-${widget.taskId}-$status'},
+      );
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated: $status'), backgroundColor: Colors.green));
+      AnalyticsService.instance.track('task_status_updated', props: {'taskId': widget.taskId, 'status': status});
       _loadTask();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not update status. Please retry.'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _updatingStatus = false);
     }
   }
 
@@ -59,8 +85,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
+              final otp = _otpController.text.trim();
+              if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid 6-digit OTP.')),
+                );
+                return;
+              }
               Navigator.pop(ctx);
-              _updateStatus(nextStatus, otp: _otpController.text.trim());
+              _updateStatus(nextStatus, otp: otp);
               _otpController.clear();
             },
             child: const Text('Verify'),
@@ -71,8 +104,45 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _openMaps(double lat, double lng) async {
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
-    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final googleUri = Uri.parse('comgooglemaps://?daddr=$lat,$lng&directionsmode=driving');
+    final wazeUri = Uri.parse('waze://?ll=$lat,$lng&navigate=yes');
+    final webUri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.map),
+              title: const Text('Open in Google Maps'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                if (await canLaunchUrl(googleUri)) {
+                  await launchUrl(googleUri, mode: LaunchMode.externalApplication);
+                } else {
+                  await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.alt_route),
+              title: const Text('Open in Waze'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                if (await canLaunchUrl(wazeUri)) {
+                  await launchUrl(wazeUri, mode: LaunchMode.externalApplication);
+                } else {
+                  await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -214,6 +284,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       }
     }
 
+    if (_updatingStatus) {
+      widgets.add(const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: CircularProgressIndicator()),
+      ));
+    }
+
     return widgets;
   }
 
@@ -224,7 +301,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         width: double.infinity,
         height: 50,
         child: ElevatedButton(
-          onPressed: onPressed,
+          onPressed: _updatingStatus ? null : onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: color,
             foregroundColor: Colors.white,

@@ -92,6 +92,8 @@ class _ShopDashboardScreenState extends State<ShopDashboardScreen> {
                   onTap: () => Navigator.pushNamed(context, '/insights')),
               _ActionTile(icon: Icons.notifications_active, title: 'Notifications', subtitle: 'Role-based alert preferences',
                   onTap: () => Navigator.pushNamed(context, '/notifications')),
+              _ActionTile(icon: Icons.health_and_safety, title: 'Incident Center', subtitle: 'Monitor socket/offline/action health',
+                  onTap: () => Navigator.pushNamed(context, '/incidents')),
             ],
           ),
         ),

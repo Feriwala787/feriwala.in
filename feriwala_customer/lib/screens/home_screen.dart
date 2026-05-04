@@ -433,13 +433,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final categories = _mergedCategories();
@@ -826,6 +819,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     _SectionRow(title: 'Trending in your area', products: _browseProductsAsMap().take(8).toList()),
                     _SectionRow(title: 'Selling fast near you', products: _browseProductsAsMap().reversed.take(8).toList()),
                     _SectionRow(title: 'New arrivals today', products: _browseProductsAsMap().take(8).toList()),
+                    _SectionRow(title: 'Budget Picks Under ₹499', products: _browseProductsAsMap().where((p) => (double.tryParse((p['sellingPrice'] ?? p['price'] ?? '0').toString()) ?? 0) <= 499).take(8).toList()),
+                    _SectionRow(title: 'Premium Styles Above ₹999', products: _browseProductsAsMap().where((p) => (double.tryParse((p['sellingPrice'] ?? p['price'] ?? '0').toString()) ?? 0) >= 999).take(8).toList()),
                     _SectionRow(title: 'Recently Dropped Prices', products: _recentlyDroppedPrices()),
                     _SectionRow(title: 'Back in Stock for You', products: _backInStockProducts()),
                     _SectionRow(title: 'Because you viewed', products: _becauseYouViewed()),
@@ -1083,11 +1078,11 @@ class _ProductCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: Container(
-                height: 140,
-                color: Colors.grey[200],
-                child: images.isNotEmpty
-                    ? Image.network(images[0], fit: BoxFit.cover, width: double.infinity)
+                child: Container(
+                  height: 140,
+                  color: Colors.grey[200],
+                  child: images.isNotEmpty
+                    ? Image.network(images[0], fit: BoxFit.cover, width: double.infinity, loadingBuilder: (c, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)))
                     : const Center(child: Icon(Icons.checkroom, size: 40, color: Colors.grey)),
               ),
             ),
@@ -1124,6 +1119,8 @@ class _ProductGridItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final images = product['images'] as List? ?? [];
+    final sizes = (product['size'] ?? '').toString().split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(2).toList();
+    final colors = (product['color'] ?? '').toString().split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(2).toList();
     return GestureDetector(
       onTap: () {
         AnalyticsService().track('product_clicked', props: {'productId': product['id'], 'surface': 'browse_grid'});
@@ -1145,7 +1142,7 @@ class _ProductGridItem extends StatelessWidget {
                   width: double.infinity,
                   color: Colors.grey[200],
                   child: images.isNotEmpty
-                      ? Image.network(images[0], fit: BoxFit.cover)
+                      ? Image.network(images[0], fit: BoxFit.cover, loadingBuilder: (c, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)))
                       : const Center(child: Icon(Icons.checkroom, size: 40, color: Colors.grey)),
                 ),
               ),
@@ -1169,6 +1166,15 @@ class _ProductGridItem extends StatelessWidget {
                           style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w500)),
                   ]),
                   const SizedBox(height: 4),
+                  if (sizes.isNotEmpty || colors.isNotEmpty)
+                    Wrap(
+                      spacing: 4,
+                      children: [
+                        ...sizes.map((s) => Chip(label: Text(s, style: const TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact)),
+                        ...colors.map((c) => Chip(label: Text(c, style: const TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact)),
+                      ],
+                    ),
+                  const SizedBox(height: 4),
                   const Wrap(
                     spacing: 4,
                     runSpacing: -8,
@@ -1180,6 +1186,17 @@ class _ProductGridItem extends StatelessWidget {
                   Text(
                     'Quick view: color/size options',
                     style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        AnalyticsService().track('quick_add_clicked', props: {'productId': product['id']});
+                        Navigator.pushNamed(context, '/product', arguments: product['id']);
+                      },
+                      child: const Text('Quick Add'),
+                    ),
                   ),
                 ],
               ),

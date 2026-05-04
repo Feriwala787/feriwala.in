@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'services/error_reporter.dart';
+import 'services/background_sync_service.dart';
 import 'services/required_permissions_service.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
@@ -11,6 +12,7 @@ import 'screens/delivery_home_screen.dart';
 import 'screens/task_detail_screen.dart';
 import 'screens/return_verification_screen.dart';
 import 'screens/delivery_profile_screen.dart';
+import 'screens/delivery_diagnostics_screen.dart';
 
 int? _parseRouteInt(Object? value) {
   if (value is int) return value;
@@ -46,6 +48,8 @@ void main() async {
     await RequiredPermissionsService().requestStartupPermissions();
 
     await DeliveryApiService().init();
+    await BackgroundSyncService.instance.init();
+    await BackgroundSyncService.instance.registerPeriodicTasks();
   } catch (error, stackTrace) {
     ErrorReporter.report(error, stackTrace, context: 'api-init');
     if (!kReleaseMode) {
@@ -83,6 +87,7 @@ class FeriwalaDeliveryApp extends StatelessWidget {
           '/login': (context) => const DeliveryLoginScreen(),
           '/home': (context) => const DeliveryHomeScreen(),
           '/profile': (context) => const DeliveryProfileScreen(),
+          '/diagnostics': (context) => const DeliveryDiagnosticsScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/task-detail') {

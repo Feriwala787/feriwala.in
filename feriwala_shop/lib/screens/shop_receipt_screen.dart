@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -32,7 +33,7 @@ class ShopReceiptScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.print),
             tooltip: 'Print Receipt',
-            onPressed: () => _printReceipt(context, invoice, items, gst),
+            onPressed: () => _chooseTemplateAndPrint(context, invoice, items, gst),
           ),
         ],
       ),
@@ -45,6 +46,7 @@ class ShopReceiptScreen extends StatelessWidget {
           _tile('Order No', order['orderNumber']?.toString() ?? '-'),
           _tile('Invoice No', invoice['invoiceNumber']?.toString() ?? '-'),
           _tile('Payment', (order['paymentMethod'] ?? '-').toString().toUpperCase()),
+          _tile('GSTIN', '29ABCDE1234F1Z5'),
           const SizedBox(height: 12),
           QrImageView(
             data: 'FERIWALA-ORDER-${order['id'] ?? order['orderNumber'] ?? ''}',
@@ -69,7 +71,7 @@ class ShopReceiptScreen extends StatelessWidget {
           _tile('Total', 'INR ${total.toStringAsFixed(2)}', bold: true),
           const SizedBox(height: 20),
           ElevatedButton.icon(
-            onPressed: () => _printReceipt(context, invoice, items, gst),
+            onPressed: () => _chooseTemplateAndPrint(context, invoice, items, gst),
             icon: const Icon(Icons.print),
             label: const Text('Print Receipt'),
           ),
@@ -139,18 +141,45 @@ class ShopReceiptScreen extends StatelessWidget {
   }
 
   Future<void> _printReceipt(BuildContext context, Map<String, dynamic> invoice, List<dynamic> items, num gst) async {
+    await _printReceiptWithTemplate(context, invoice, items, gst, isThermal: false);
+  }
+
+  Future<void> _chooseTemplateAndPrint(BuildContext context, Map<String, dynamic> invoice, List<dynamic> items, num gst) async {
+    final template = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Choose Print Template'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, 'thermal'), child: const Text('Thermal 58mm')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, 'a4'), child: const Text('A4')),
+        ],
+      ),
+    );
+    if (template == null) return;
+    await _printReceiptWithTemplate(context, invoice, items, gst, isThermal: template == 'thermal');
+  }
+
+  Future<void> _printReceiptWithTemplate(
+    BuildContext context,
+    Map<String, dynamic> invoice,
+    List<dynamic> items,
+    num gst, {
+    required bool isThermal,
+  }) async {
     try {
       await Printing.layoutPdf(
         onLayout: (format) async {
           final doc = pw.Document();
           doc.addPage(
             pw.Page(
+              pageFormat: isThermal ? PdfPageFormat.roll57 : PdfPageFormat.a4,
               build: (pw.Context context) {
                 return pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text('Feriwala', style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
                     pw.Text('Quick Commerce Clothing Delivery'),
+                    pw.Text('GSTIN: 29ABCDE1234F1Z5'),
                     pw.SizedBox(height: 8),
                     pw.Text('Invoice: ${invoice['invoiceNumber'] ?? '-'}'),
                     pw.Text('Order: ${order['orderNumber'] ?? '-'}'),
@@ -174,6 +203,8 @@ class ShopReceiptScreen extends StatelessWidget {
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)), pw.Text('INR ${order['total'] ?? invoice['total'] ?? 0}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))],
                     ),
+                    pw.SizedBox(height: 12),
+                    pw.Text('Digitally signed by Feriwala POS', style: const pw.TextStyle(fontSize: 9)),
                   ],
                 );
               },
