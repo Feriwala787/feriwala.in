@@ -22,13 +22,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _promoLoading = false;
   String? _serviceabilityMessage;
   String _clientOrderId = DateTime.now().millisecondsSinceEpoch.toString();
-
-  static const double _taxRate = 0.05;
+  Map<String, dynamic>? _quote;
+  bool _quoteLoading = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadActivePromos());
+    WidgetsBinding.instance.addPostFrameCallback((_) { _loadActivePromos(); _loadQuote(); });
   }
 
   Future<void> _loadActivePromos() async {
@@ -43,6 +43,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() => _activePromos = []);
     } finally {
       if (mounted) setState(() => _promoLoading = false);
+    }
+  }
+
+
+
+  Future<void> _loadQuote() async {
+    final cart = context.read<CartProvider>();
+    if (cart.shopId == null || cart.items.isEmpty) return;
+    setState(() => _quoteLoading = true);
+    try {
+      final res = await ApiService().post('/orders/quote', body: {
+        'shopId': cart.shopId,
+        'items': cart.items.map((i) => i.toOrderItem()).toList(),
+        if (cart.promoCode != null) 'promoCode': cart.promoCode,
+      });
+      setState(() => _quote = res['data']);
+    } catch (_) {
+      setState(() => _quote = null);
+    } finally {
+      if (mounted) setState(() => _quoteLoading = false);
     }
   }
 
@@ -247,9 +267,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final auth = context.watch<AuthProvider>();
     final addresses = (auth.user?['addresses'] as List?) ?? [];
 
-    final deliveryFee = 30.0;
-    final tax = cart.subtotal * _taxRate;
-    final grandTotal = cart.total + tax + deliveryFee;
+    final deliveryFee = (_quote?['deliveryFee'] as num?)?.toDouble() ?? 30.0;
+    final tax = (_quote?['tax'] as num?)?.toDouble() ?? 0;
+    final grandTotal = (_quote?['total'] as num?)?.toDouble() ?? (cart.total + tax + deliveryFee);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
@@ -270,7 +290,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             content: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               ...cart.items.map((i) => Text('${i.name} x${i.quantity} • INR ${i.total.toStringAsFixed(2)}')),
               const SizedBox(height: 8),
-              Text('Subtotal: INR ${cart.subtotal.toStringAsFixed(2)}'),
+              Text('Subtotal: INR ${((_quote?['subtotal'] as num?)?.toDouble() ?? cart.subtotal).toStringAsFixed(2)}'),
               const SizedBox(height: 8),
               if (_promoLoading) const CircularProgressIndicator(),
               if (!_promoLoading && _activePromos.isNotEmpty)
@@ -281,7 +301,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     onPressed: () async {
                       try {
                         await context.read<CartProvider>().applyPromo((promo['code'] ?? '').toString());
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Promo applied')));
+                        if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Promo applied'))); _loadQuote(); }
                       } catch (e) {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
                       }
@@ -319,7 +339,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             title: const Text('Review'),
             isActive: _step >= 3,
             content: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Discount: INR ${cart.discount.toStringAsFixed(2)}'),
+              if (_quoteLoading) const CircularProgressIndicator(),
+              Text('Discount: INR ${((_quote?['discount'] as num?)?.toDouble() ?? cart.discount).toStringAsFixed(2)}'),
               Text('Delivery Fee: INR ${deliveryFee.toStringAsFixed(2)}'),
               Text('Taxes: INR ${tax.toStringAsFixed(2)}'),
               Text('Total: INR ${grandTotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
