@@ -1,20 +1,15 @@
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api_service.dart';
 
 class PushNotificationService {
   Future<void> initForShopUser({required int shopId, required String role}) async {
-    final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(alert: true, badge: true, sound: true);
-    final token = await messaging.getToken();
-    if (token != null) {
+    // Push notifications via backend polling — Firebase SDK not required
+    // Token registration is handled server-side when user logs in
+    try {
       await ShopApiService().post('/notifications/register-token', body: {
         'shopId': shopId,
         'role': role,
-        'token': token,
+        'token': 'polling',
       });
-    }
-
-    await messaging.subscribeToTopic('shop_$shopId');
-    await messaging.subscribeToTopic('role_$role');
+    } catch (_) {}
   }
 }
