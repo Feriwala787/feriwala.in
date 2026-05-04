@@ -81,6 +81,10 @@ class CartScreen extends StatelessWidget {
                                     onPressed: () => cart.updateQuantity(index, item.quantity - 1),
                                     iconSize: 28,
                                   ),
+                                  TextButton(
+                                    onPressed: () => cart.moveToSaved(index),
+                                    child: const Text('Save'),
+                                  ),
                                 ],
                               ),
                             ],
@@ -159,6 +163,26 @@ class CartScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (cart.savedItems.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Saved for later', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        ...cart.savedItems.asMap().entries.map((entry) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(entry.value.name),
+                          subtitle: Text('INR ${entry.value.price.toStringAsFixed(2)}'),
+                          trailing: OutlinedButton(
+                            onPressed: () => cart.moveToCartFromSaved(entry.key),
+                            child: const Text('Move to cart'),
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
               ],
             ),
     );
