@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../utils/notification_prefs.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -57,6 +58,64 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showNotificationPrefs(BuildContext context) async {
+    final current = await NotificationPrefs.load();
+    bool orderUpdates = current['orderUpdates'] ?? true;
+    bool returnUpdates = current['returnUpdates'] ?? true;
+    bool promotions = current['promotions'] ?? false;
+
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setModalState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Notification Preferences', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                SwitchListTile(
+                  value: orderUpdates,
+                  onChanged: (v) => setModalState(() => orderUpdates = v),
+                  title: const Text('Order updates'),
+                ),
+                SwitchListTile(
+                  value: returnUpdates,
+                  onChanged: (v) => setModalState(() => returnUpdates = v),
+                  title: const Text('Return/refund updates'),
+                ),
+                SwitchListTile(
+                  value: promotions,
+                  onChanged: (v) => setModalState(() => promotions = v),
+                  title: const Text('Offers and promotions'),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await NotificationPrefs.save(
+                        orderUpdates: orderUpdates,
+                        returnUpdates: returnUpdates,
+                        promotions: promotions,
+                      );
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notification preferences saved')));
+                      }
+                    },
+                    child: const Text('Save Preferences'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -231,6 +290,7 @@ class ProfileScreen extends StatelessWidget {
                 )),
             const SizedBox(height: 12),
             _ProfileTile(icon: Icons.receipt_long, title: 'My Orders', onTap: () => Navigator.pushNamed(context, '/orders')),
+            _ProfileTile(icon: Icons.notifications_outlined, title: 'Notification Preferences', onTap: () => _showNotificationPrefs(context)),
             _ProfileTile(icon: Icons.card_giftcard, title: 'Refer & Earn', onTap: () => _showReferralSheet(context, user)),
             _ProfileTile(icon: Icons.help_outline, title: 'Help & Support', onTap: () {}),
             _ProfileTile(icon: Icons.info_outline, title: 'About', onTap: () {}),
