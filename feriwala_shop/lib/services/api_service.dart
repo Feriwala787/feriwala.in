@@ -63,14 +63,35 @@ class ShopApiService {
 
   Future<Map<String, dynamic>> _requestWithAutoRefresh(
       Future<http.Response> Function() requestFn) async {
-    final response = await requestFn();
+    final response = await _requestWithRetry(requestFn);
     if (response.statusCode != 401) return _handleResponse(response);
 
     final refreshed = await _tryRefreshToken();
     if (!refreshed) return _handleResponse(response);
 
-    final retryResponse = await requestFn();
+    final retryResponse = await _requestWithRetry(requestFn);
     return _handleResponse(retryResponse);
+  }
+
+  Future<http.Response> _requestWithRetry(
+    Future<http.Response> Function() requestFn, {
+    int maxAttempts = 3,
+  }) async {
+    int attempt = 0;
+    while (true) {
+      attempt++;
+      try {
+        final response = await requestFn();
+        if (response.statusCode >= 500 && attempt < maxAttempts) {
+          await Future.delayed(Duration(milliseconds: 250 * (1 << (attempt - 1))));
+          continue;
+        }
+        return response;
+      } catch (_) {
+        if (attempt >= maxAttempts) rethrow;
+        await Future.delayed(Duration(milliseconds: 250 * (1 << (attempt - 1))));
+      }
+    }
   }
 
   Future<Map<String, dynamic>> get(String endpoint,
