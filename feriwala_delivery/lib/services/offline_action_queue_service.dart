@@ -50,6 +50,7 @@ class OfflineActionQueueService {
   static final OfflineActionQueueService instance = OfflineActionQueueService();
 
   static const _storageKey = 'delivery_offline_action_queue';
+  static const _maxQueueSize = 200;
   final DeliveryApiService _api;
   bool _isProcessing = false;
 
@@ -73,6 +74,7 @@ class OfflineActionQueueService {
   }) async {
     final actions = await loadQueue();
     final actionId = id ?? '${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(99999)}';
+    actions.removeWhere((a) => a.id == actionId || (a.endpoint == endpoint && a.body.toString() == body.toString()));
     actions.add(OfflineAction(
       id: actionId,
       endpoint: endpoint,
@@ -80,6 +82,9 @@ class OfflineActionQueueService {
       retryCount: 0,
       nextAttemptAt: DateTime.now(),
     ));
+    if (actions.length > _maxQueueSize) {
+      actions.removeRange(0, actions.length - _maxQueueSize);
+    }
     await _saveQueue(actions);
   }
 

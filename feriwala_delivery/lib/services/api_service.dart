@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'token_storage_service.dart';
 import 'error_reporter.dart';
 
@@ -33,8 +32,7 @@ class DeliveryApiService {
 
   Future<bool> _tryRefreshToken() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final refreshToken = await TokenStorageService.instance.readRefreshToken() ?? prefs.getString('delivery_refresh_token');
+      final refreshToken = await TokenStorageService.instance.readRefreshToken();
       if (refreshToken == null) return false;
 
       final response = await http.post(
@@ -52,7 +50,6 @@ class DeliveryApiService {
       await setToken(accessToken.toString());
       if (newRefreshToken != null) {
         await TokenStorageService.instance.writeRefreshToken(newRefreshToken.toString());
-        await prefs.setString('delivery_refresh_token', newRefreshToken.toString());
       }
       return true;
     } catch (_) {

@@ -51,4 +51,18 @@ void main() {
     final list = jsonDecode(prefs.getString('delivery_offline_action_queue')!) as List<dynamic>;
     expect((list.first['retryCount'] as num).toInt(), 1);
   });
+
+  test('enqueue deduplicates by id and caps queue size', () async {
+    final api = FakeApiService();
+    final queue = OfflineActionQueueService(api: api);
+
+    await queue.enqueuePut(endpoint: '/delivery/location', body: {'latitude': 1, 'longitude': 2}, id: 'loc-1');
+    await queue.enqueuePut(endpoint: '/delivery/location', body: {'latitude': 1, 'longitude': 2}, id: 'loc-1');
+    expect(await queue.pendingCount(), 1);
+
+    for (var i = 0; i < 220; i++) {
+      await queue.enqueuePut(endpoint: '/delivery/tasks/$i/accept', body: const {}, id: 'task-$i');
+    }
+    expect(await queue.pendingCount(), 200);
+  });
 }
