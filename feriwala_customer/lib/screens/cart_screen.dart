@@ -71,7 +71,7 @@ class CartScreen extends StatelessWidget {
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.add_circle, color: Color(0xFFF47721)),
-                                    onPressed: () => cart.updateQuantity(index, item.quantity + 1),
+                                    onPressed: item.quantity >= 10 ? null : () => cart.updateQuantity(index, item.quantity + 1),
                                     iconSize: 28,
                                   ),
                                   Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -80,6 +80,10 @@ class CartScreen extends StatelessWidget {
                                         color: item.quantity > 1 ? const Color(0xFFF47721) : Colors.red),
                                     onPressed: () => cart.updateQuantity(index, item.quantity - 1),
                                     iconSize: 28,
+                                  ),
+                                  TextButton(
+                                    onPressed: () => cart.moveToSaved(index),
+                                    child: const Text('Save'),
                                   ),
                                 ],
                               ),
@@ -113,6 +117,16 @@ class CartScreen extends StatelessWidget {
                           Text('INR ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w500)),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: const [Text('Delivery Fee'), Text('INR 30.00')],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [Text('Taxes (5%)'), Text('INR ${(cart.subtotal * 0.05).toStringAsFixed(2)}')],
+                      ),
                       if (cart.discount > 0) ...[
                         const SizedBox(height: 4),
                         Row(
@@ -128,7 +142,7 @@ class CartScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          Text('INR ${cart.total.toStringAsFixed(2)}',
+                          Text('INR ${(cart.total + 30 + cart.subtotal * 0.05).toStringAsFixed(2)}',
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                         ],
                       ),
@@ -149,6 +163,26 @@ class CartScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (cart.savedItems.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Saved for later', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        ...cart.savedItems.asMap().entries.map((entry) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(entry.value.name),
+                          subtitle: Text('INR ${entry.value.price.toStringAsFixed(2)}'),
+                          trailing: OutlinedButton(
+                            onPressed: () => cart.moveToCartFromSaved(entry.key),
+                            child: const Text('Move to cart'),
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
               ],
             ),
     );

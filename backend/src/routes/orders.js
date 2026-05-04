@@ -15,6 +15,127 @@ const { generateOrderNumber, generateInvoiceNumber, generateOtp } = require('../
 const { Op } = require('sequelize');
 const { createOrAssignDeliveryTask } = require('../services/deliveryTaskService');
 
+// Check delivery serviceability (customer)
+router.post('/serviceability', authenticate, authorize('customer'), [
+  body('shopId').isInt(),
+  body('deliveryAddress').isObject(),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { shopId, deliveryAddress } = req.body;
+    const shop = await Shop.findByPk(shopId);
+    if (!shop || !shop.isActive) {
+      return res.status(400).json({ success: false, message: 'Shop not available' });
+    }
+
+    const pincode = (deliveryAddress?.pincode || '').toString().trim();
+    if (pincode.length !== 6) {
+      return res.status(400).json({ success: false, message: 'Invalid pincode' });
+    }
+
+    const radiusKm = Number(shop.deliveryRadiusKm || 0);
+    const hasGeo = shop.latitude && shop.longitude && deliveryAddress?.latitude && deliveryAddress?.longitude;
+    if (radiusKm > 0 && hasGeo) {
+      const toRad = (deg) => (deg * Math.PI) / 180;
+      const R = 6371;
+      const dLat = toRad(Number(deliveryAddress.latitude) - Number(shop.latitude));
+      const dLon = toRad(Number(deliveryAddress.longitude) - Number(shop.longitude));
+      const lat1 = toRad(Number(shop.latitude));
+      const lat2 = toRad(Number(deliveryAddress.latitude));
+      const a = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distanceKm = R * c;
+      if (distanceKm > radiusKm) {
+        return res.status(400).json({
+          success: false,
+          message: `Delivery address is outside serviceable radius (${radiusKm} km)`,
+          data: { distanceKm: Number(distanceKm.toFixed(2)), radiusKm },
+        });
+      }
+      return res.json({ success: true, data: { serviceable: true, distanceKm: Number(distanceKm.toFixed(2)), radiusKm } });
+    }
+
+    return res.json({ success: true, data: { serviceable: true } });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
+
+// Quote order totals (customer)
+router.post('/quote', authenticate, authorize('customer'), [
+  body('shopId').isInt(),
+  body('items').isArray({ min: 1 }),
+  body('items.*.productId').isInt(),
+  body('items.*.quantity').isInt({ min: 1 }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, errors: errors.array() });
+    }
+
+    const { shopId, items, promoCode } = req.body;
+    const shop = await Shop.findByPk(shopId);
+    if (!shop || !shop.isActive) {
+      return res.status(400).json({ success: false, message: 'Shop not available' });
+    }
+
+    let subtotal = 0;
+    for (const item of items) {
+      const product = await Product.findByPk(item.productId, {
+        include: [{ model: Inventory, as: 'inventory', where: { shopId } }],
+      });
+      if (!product || !product.isActive) {
+        return res.status(400).json({ success: false, message: `Product ${item.productId} not available` });
+      }
+      const inv = product.inventory[0];
+      const availableQty = inv.quantity - inv.reservedQuantity;
+      if (availableQty < item.quantity) {
+        return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}. Available: ${availableQty}` });
+      }
+      subtotal += (product.sellingPrice * item.quantity);
+    }
+
+    let discount = 0;
+    if (promoCode) {
+      const promo = await PromoCode.findOne({
+        where: {
+          shopId,
+          code: promoCode.toUpperCase(),
+          isActive: true,
+          validFrom: { [Op.lte]: new Date() },
+          validTo: { [Op.gte]: new Date() },
+        },
+      });
+      if (promo && subtotal >= promo.minOrderAmount) {
+        if (promo.discountType === 'percentage') {
+          discount = (subtotal * promo.discountValue) / 100;
+          if (promo.maxDiscount && discount > promo.maxDiscount) discount = parseFloat(promo.maxDiscount);
+        } else {
+          discount = parseFloat(promo.discountValue);
+        }
+      }
+    }
+
+    const deliveryFee = parseFloat(shop.deliveryFee) || 0;
+    const tax = 0;
+    const total = subtotal - discount + deliveryFee + tax;
+
+    if (shop.minOrderAmount > 0 && subtotal < shop.minOrderAmount) {
+      return res.status(400).json({ success: false, message: `Minimum order amount is ₹${shop.minOrderAmount}` });
+    }
+
+    return res.json({ success: true, data: { subtotal, discount, deliveryFee, tax, total, minOrderAmount: shop.minOrderAmount } });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
 // Place order (customer)
 router.post('/', authenticate, authorize('customer'), [
   body('shopId').isInt(),
