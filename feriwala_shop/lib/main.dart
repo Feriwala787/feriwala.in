@@ -14,6 +14,8 @@ import 'screens/shop_promos_screen.dart';
 import 'screens/shop_inventory_screen.dart';
 import 'screens/delivery_management_screen.dart';
 import 'screens/shop_returns_screen.dart';
+import 'screens/notification_preferences_screen.dart';
+import 'screens/shop_insights_screen.dart';
 
 int? _parseRouteInt(Object? value) {
   if (value is int) return value;
@@ -90,6 +92,8 @@ class FeriwalaShopApp extends StatelessWidget {
           '/inventory': (context) => const ShopInventoryScreen(),
           '/delivery': (context) => const DeliveryManagementScreen(),
           '/returns': (context) => const ShopReturnsScreen(),
+          '/notifications': (context) => const NotificationPreferencesScreen(),
+          '/insights': (context) => const ShopInsightsScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/order-detail') {
