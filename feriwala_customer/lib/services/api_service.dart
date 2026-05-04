@@ -15,9 +15,10 @@ class ApiService {
     _token = prefs.getString('access_token');
   }
 
-  Map<String, String> get _headers => {
+  Map<String, String> _headers({Map<String, String>? extra}) => {
         'Content-Type': 'application/json',
         if (_token != null) 'Authorization': 'Bearer $_token',
+        ...?extra,
       };
 
   Future<void> setToken(String token) async {
@@ -37,14 +38,14 @@ class ApiService {
       {Map<String, String>? queryParams}) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$endpoint')
         .replace(queryParameters: queryParams);
-    return _requestWithAutoRefresh(() => http.get(uri, headers: _headers));
+    return _requestWithAutoRefresh(() => http.get(uri, headers: _headers()));
   }
 
   Future<Map<String, dynamic>> post(String endpoint,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, Map<String, String>? headers}) async {
     return _requestWithAutoRefresh(() => http.post(
       Uri.parse('${AppConfig.apiBaseUrl}$endpoint'),
-      headers: _headers,
+      headers: _headers(extra: headers),
       body: jsonEncode(body),
     ));
   }
@@ -53,7 +54,7 @@ class ApiService {
       {Map<String, dynamic>? body}) async {
     return _requestWithAutoRefresh(() => http.put(
       Uri.parse('${AppConfig.apiBaseUrl}$endpoint'),
-      headers: _headers,
+      headers: _headers(),
       body: jsonEncode(body),
     ));
   }

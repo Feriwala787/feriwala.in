@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final int orderId;
@@ -232,6 +233,28 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     }
   }
 
+
+
+  String _labelForStatus(String status) {
+    switch (status) {
+      case 'pending': return 'Order Received';
+      case 'confirmed': return 'Order Confirmed';
+      case 'preparing': return 'Being Packed';
+      case 'ready_for_pickup': return 'Ready for Pickup';
+      case 'picked_up': return 'Picked by Rider';
+      case 'out_for_delivery': return 'Out for Delivery';
+      case 'delivered': return 'Delivered';
+      default: return status.replaceAll('_', ' ');
+    }
+  }
+
+  Future<void> _contactSupport() async {
+    final uri = Uri.parse('tel:+919999999999');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     String freshnessText(dynamic updatedAt) {
@@ -297,7 +320,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                       child: Padding(
                                         padding: const EdgeInsets.only(bottom: 16),
                                         child: Text(
-                                          step.replaceAll('_', ' ').toUpperCase(),
+                                          _labelForStatus(step),
                                           style: TextStyle(
                                             fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                                             color: isActive ? Colors.black : Colors.grey,
@@ -308,6 +331,28 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                   ],
                                 );
                               }),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Need help?', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  OutlinedButton.icon(onPressed: _contactSupport, icon: const Icon(Icons.call), label: const Text('Call Support')),
+                                  OutlinedButton.icon(onPressed: _cancelOrder, icon: const Icon(Icons.cancel_outlined), label: const Text('Cancel if eligible')),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Text('Return eligibility: within 7 days of delivery for eligible items.', style: TextStyle(fontSize: 12, color: Colors.grey)),
                             ],
                           ),
                         ),
