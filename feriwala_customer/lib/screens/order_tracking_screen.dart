@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/error_reporter.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final int orderId;
@@ -56,6 +57,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         _loading = false;
       });
     } catch (e) {
+      ErrorReporter.message('order_tracking_load_failed');
       setState(() => _loading = false);
     }
   }
@@ -131,6 +133,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     int selectedItemId = items.first['id'];
     String returnType = 'return';
+    String selectedReason = 'Damaged item';
+    String pickupSlot = 'Tomorrow (10 AM - 1 PM)';
     final reasonController = TextEditingController();
     final accountHolderController = TextEditingController();
     final accountNumberController = TextEditingController();
@@ -174,6 +178,29 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   decoration: const InputDecoration(labelText: 'Reason'),
                 ),
                 const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedReason,
+                  decoration: const InputDecoration(labelText: 'Reason category'),
+                  items: const [
+                    DropdownMenuItem(value: 'Damaged item', child: Text('Damaged item')),
+                    DropdownMenuItem(value: 'Wrong size/fit', child: Text('Wrong size/fit')),
+                    DropdownMenuItem(value: 'Color mismatch', child: Text('Color mismatch')),
+                    DropdownMenuItem(value: 'Quality issue', child: Text('Quality issue')),
+                  ],
+                  onChanged: (val) => setModalState(() => selectedReason = val ?? selectedReason),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: pickupSlot,
+                  decoration: const InputDecoration(labelText: 'Preferred pickup slot'),
+                  items: const [
+                    DropdownMenuItem(value: 'Tomorrow (10 AM - 1 PM)', child: Text('Tomorrow (10 AM - 1 PM)')),
+                    DropdownMenuItem(value: 'Tomorrow (2 PM - 5 PM)', child: Text('Tomorrow (2 PM - 5 PM)')),
+                    DropdownMenuItem(value: 'Day after (10 AM - 1 PM)', child: Text('Day after (10 AM - 1 PM)')),
+                  ],
+                  onChanged: (val) => setModalState(() => pickupSlot = val ?? pickupSlot),
+                ),
+                const SizedBox(height: 8),
                 if (returnType == 'return') ...[
                   TextField(
                     controller: accountHolderController,
@@ -208,6 +235,8 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   'orderItemId': selectedItemId,
                   'returnType': returnType,
                   'reason': reasonController.text.trim(),
+                  'reasonCategory': selectedReason,
+                  'preferredPickupSlot': pickupSlot,
                   'bankDetails': {
                     'accountHolder': accountHolderController.text.trim(),
                     'accountNumber': accountNumberController.text.trim(),
@@ -417,6 +446,38 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         ),
 
                       if (_deliveryStatus?['agent'] != null) const SizedBox(height: 12),
+
+                      if (_returnRequests.isNotEmpty) ...[
+                        Card(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Return / Refund Timeline', style: TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 8),
+                                ..._returnRequests.map((r) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.history, size: 16, color: Color(0xFFF47721)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '${(r['status'] ?? r['refundStatus'] ?? 'requested').toString().replaceAll('_', ' ')} • ${(r['reasonCategory'] ?? r['reason'] ?? '').toString()}',
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
 
                       if (_order!['status'] == 'pending' || _order!['status'] == 'confirmed')
                         SizedBox(
