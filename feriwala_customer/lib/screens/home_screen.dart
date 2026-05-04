@@ -300,11 +300,15 @@ class _HomeScreenState extends State<HomeScreen> {
           .whereType<Map>()
           .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
           .toList();
+      final filteredProducts = _applyLocalFilters(products);
       setState(() {
-        _browseProducts = _page == 1 ? _applyLocalFilters(products) : [..._browseProducts, ..._applyLocalFilters(products)];
+        _browseProducts = _page == 1 ? filteredProducts : [..._browseProducts, ...filteredProducts];
         _hasMoreProducts = products.length >= 20;
       });
       AnalyticsService().track('browse_products_loaded', props: {'page': _page, 'count': products.length});
+      if (_page == 1 && filteredProducts.isEmpty) {
+        AnalyticsService().track('browse_empty_state');
+      }
     } catch (_) {
       setState(() => _browseProducts = []);
       ErrorReporter.message('browse_products_load_failed');
@@ -861,6 +865,22 @@ class _HomeScreenState extends State<HomeScreen> {
                             final product = _homeFeed!['featured'][index];
                             return _ProductCard(product: product);
                           },
+                        ),
+                      ),
+                    if (_hasMoreProducts && !_productLoading && _browseProducts.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              _page += 1;
+                              AnalyticsService().track('browse_load_more', props: {'page': _page});
+                              _loadBrowseProducts();
+                            },
+                            icon: const Icon(Icons.expand_more),
+                            label: const Text('Load more'),
+                          ),
                         ),
                       ),
                     Padding(
