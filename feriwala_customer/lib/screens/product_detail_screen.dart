@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
+import '../services/analytics_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int productId;
@@ -21,6 +22,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
   String? _selectedSize;
   String? _selectedColor;
+  int _selectedImageIndex = 0;
 
   Map<String, dynamic> get _attributes {
     final raw = _product?['attributes'];
@@ -51,6 +53,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return const {};
   }
 
+  Map<String, dynamic> get _variantPrices {
+    final raw = _attributes['variantPrices'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((key, value) => MapEntry(key.toString(), value));
+    return const {};
+  }
+
+  Map<String, dynamic> get _colorImages {
+    final raw = _attributes['colorImages'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((key, value) => MapEntry(key.toString(), value));
+    return const {};
+  }
+
   List<String> get _availableColors {
     final colorString = (_product?['color'] ?? '').toString();
     if (colorString.isEmpty) return [];
@@ -70,6 +86,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     if (_selectedSize != null) return _stockForSize(_selectedSize!);
     return (_product?['inventory'] as List?)?.isNotEmpty == true ? ((_product!['inventory'][0]['quantity'] ?? 0) as num).toInt() : 0;
+  }
+
+  bool _isVariantSelectable(String size, String color) {
+    if (_variantStock.isEmpty) return true;
+    final key = '${size}__${color}';
+    return (int.tryParse(_variantStock[key].toString()) ?? 0) > 0;
+  }
+
+  double _selectedVariantPrice() {
+    if (_selectedSize != null && _selectedColor != null && _variantPrices.isNotEmpty) {
+      final key = '${_selectedSize!}__${_selectedColor!}';
+      final v = _variantPrices[key];
+      if (v != null) return double.tryParse(v.toString()) ?? double.parse(_product!['sellingPrice'].toString());
+    }
+    return double.parse(_product!['sellingPrice'].toString());
   }
 
   @override
@@ -133,7 +164,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       CartItem(
         productId: _product!['id'],
         name: _product!['name'],
-        price: double.parse(_product!['sellingPrice'].toString()),
+        price: _selectedVariantPrice(),
         image: (_product!['images'] as List?)?.isNotEmpty == true ? _product!['images'][0] : null,
         size: _selectedSize ?? _product!['size'],
         color: _selectedColor ?? _product!['color'],
@@ -141,6 +172,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       _product!['shopId'],
     );
+    AnalyticsService().track('pdp_add_to_cart', props: {
+      'productId': _product!['id'],
+      'size': _selectedSize,
+      'color': _selectedColor,
+      'quantity': _quantity,
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Added to cart!'), backgroundColor: Color(0xFFF47721)),
     );
@@ -150,6 +187,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final selectedStock = _stockForSelection();
+    final selectedPrice = _product == null ? 0 : _selectedVariantPrice();
 
     return Scaffold(
       appBar: AppBar(
@@ -166,11 +204,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
+                              SizedBox(
                         height: 350,
                         child: (_product!['images'] as List?)?.isNotEmpty == true
                             ? PageView.builder(
                                 itemCount: (_product!['images'] as List).length,
+                                onPageChanged: (i) => setState(() => _selectedImageIndex = i),
                                 itemBuilder: (context, i) => Image.network(
                                   _product!['images'][i],
                                   fit: BoxFit.cover,
@@ -182,6 +221,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 child: const Center(child: Icon(Icons.checkroom, size: 80, color: Colors.grey)),
                               ),
                       ),
+                      if ((_product!['images'] as List?)?.length != null && (_product!['images'] as List).length > 1)
+                        SizedBox(
+                          height: 70,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            itemCount: (_product!['images'] as List).length,
+                            itemBuilder: (context, i) => GestureDetector(
+                              onTap: () => setState(() => _selectedImageIndex = i),
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: _selectedImageIndex == i ? const Color(0xFFF47721) : Colors.transparent, width: 2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Image.network((_product!['images'] as List)[i], width: 54, height: 54, fit: BoxFit.cover),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
 
                       Padding(
                         padding: const EdgeInsets.all(16),
@@ -195,7 +257,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                Text('INR ${_product!['sellingPrice']}',
+                                Text('INR ${selectedPrice.toStringAsFixed(2)}',
                                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                                 const SizedBox(width: 8),
                                 if (_product!['mrp'].toString() != _product!['sellingPrice'].toString())
@@ -228,7 +290,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   return ChoiceChip(
                                     label: Text(disabled ? '$size (Out)' : size),
                                     selected: _selectedSize == size,
-                                    onSelected: disabled ? null : (_) => setState(() => _selectedSize = size),
+                                    onSelected: disabled ? null : (_) => setState(() { _selectedSize = size; AnalyticsService().track('pdp_size_selected', props: {'size': size}); }),
                                   );
                                 }).toList(),
                               ),
@@ -240,10 +302,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               Wrap(
                                 spacing: 8,
                                 children: _availableColors.map((color) {
+                                  final sizeForCheck = _selectedSize ?? (_availableSizes.isNotEmpty ? _availableSizes.first : '');
+                                  final selectable = sizeForCheck.isEmpty ? true : _isVariantSelectable(sizeForCheck, color);
+                                  final normalized = color.toLowerCase();
+                                  final swatchColor = normalized.contains('black')
+                                      ? Colors.black
+                                      : normalized.contains('white')
+                                          ? Colors.white
+                                          : normalized.contains('blue')
+                                              ? Colors.blue
+                                              : normalized.contains('red')
+                                                  ? Colors.red
+                                                  : normalized.contains('green')
+                                                      ? Colors.green
+                                                      : Colors.grey;
                                   return ChoiceChip(
-                                    label: Text(color),
+                                    label: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: swatchColor,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.black12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(selectable ? color : '$color (Out)'),
+                                      ],
+                                    ),
                                     selected: _selectedColor == color,
-                                    onSelected: (_) => setState(() => _selectedColor = color),
+                                    onSelected: selectable
+                                        ? (_) => setState(() {
+                                              _selectedColor = color;
+                                              AnalyticsService().track('pdp_color_selected', props: {'color': color});
+                                              final colorImage = _colorImages[color];
+                                              final images = (_product!['images'] as List?) ?? [];
+                                              if (colorImage != null) {
+                                                final idx = images.indexWhere((img) => img.toString() == colorImage.toString());
+                                                if (idx >= 0) _selectedImageIndex = idx;
+                                              }
+                                            })
+                                        : null,
                                   );
                                 }).toList(),
                               ),
@@ -261,6 +363,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               const SizedBox(height: 8),
                               Text(_product!['description'], style: const TextStyle(color: Colors.grey, height: 1.5)),
                             ],
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+                              child: const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Policy highlights', style: TextStyle(fontWeight: FontWeight.w600)),
+                                  SizedBox(height: 4),
+                                  Text('• Free cancellation before pickup'),
+                                  Text('• 7-day return window on eligible items'),
+                                  Text('• Refund processed after quality check'),
+                                  Text('• Real customer photos: coming soon'),
+                                ],
+                              ),
+                            ),
                             if ((_product!['highlights'] as List?)?.isNotEmpty == true) ...[
                               const SizedBox(height: 12),
                               const Text('Highlights', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -270,6 +389,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 child: Text('• ${h.toString()}'),
                               )) ),
                             ],
+                            const SizedBox(height: 10),
+                            const Text('Complete the look', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 6),
+                            const Text('You may also like matching styles from this shop.', style: TextStyle(color: Colors.grey)),
+                            const SizedBox(height: 10),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10)),
+                              child: const Text('Similar style in your size and preferred colors will be recommended here.'),
+                            ),
                             const SizedBox(height: 24),
                             Row(
                               children: [
@@ -283,7 +413,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                                 Text('$_quantity', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                                 IconButton(
-                                  onPressed: () => setState(() => _quantity++),
+                                  onPressed: selectedStock > 0 && _quantity < selectedStock ? () => setState(() => _quantity++) : null,
                                   icon: const Icon(Icons.add_circle_outline),
                                 ),
                               ],

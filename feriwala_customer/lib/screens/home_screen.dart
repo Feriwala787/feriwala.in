@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 import '../services/error_reporter.dart';
@@ -41,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedOccasion;
   int _page = 1;
   bool _hasMoreProducts = true;
+  Timer? _searchDebounce;
 
   static const double _maxWarehouseDistanceKm = 10;
 
@@ -193,6 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _updateSearchSuggestions(String input) {
+    _searchDebounce?.cancel();
     final q = input.toLowerCase().trim();
     if (q.isEmpty) {
       setState(() => _searchSuggestions = []);
@@ -212,6 +215,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     setState(() => _searchSuggestions = suggestions.toList());
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _page = 1;
+      _loadBrowseProducts();
+    });
   }
 
   List<_CategoryTileData> _mergedCategories() {
@@ -242,6 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Map<String, dynamic>> _applyLocalFilters(List<Map<String, dynamic>> items) {
+    final query = _searchController.text.trim().toLowerCase();
     var filtered = items.where((p) {
       final price = double.tryParse((p['price'] ?? '').toString()) ?? 0;
       final discount = double.tryParse((p['discountPercent'] ?? p['discount'] ?? '').toString()) ?? 0;
@@ -269,7 +278,25 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         break;
     }
+    if (query.isNotEmpty) {
+      filtered.sort((a, b) => _scoreSearchMatch(b, query).compareTo(_scoreSearchMatch(a, query)));
+    }
     return filtered;
+  }
+
+  int _scoreSearchMatch(Map<String, dynamic> product, String query) {
+    final name = (product['name'] ?? '').toString().toLowerCase();
+    final brand = (product['brand'] ?? '').toString().toLowerCase();
+    final category = (product['category']?['name'] ?? '').toString().toLowerCase();
+    final desc = (product['description'] ?? '').toString().toLowerCase();
+
+    int score = 0;
+    if (name.startsWith(query)) score += 50;
+    if (name.contains(query)) score += 35;
+    if (brand.contains(query)) score += 20;
+    if (category.contains(query)) score += 15;
+    if (desc.contains(query)) score += 10;
+    return score;
   }
 
   Future<void> _loadBrowseProducts() async {
@@ -292,11 +319,15 @@ class _HomeScreenState extends State<HomeScreen> {
           .whereType<Map>()
           .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
           .toList();
+      final filteredProducts = _applyLocalFilters(products);
       setState(() {
-        _browseProducts = _page == 1 ? _applyLocalFilters(products) : [..._browseProducts, ..._applyLocalFilters(products)];
+        _browseProducts = _page == 1 ? filteredProducts : [..._browseProducts, ...filteredProducts];
         _hasMoreProducts = products.length >= 20;
       });
       AnalyticsService().track('browse_products_loaded', props: {'page': _page, 'count': products.length});
+      if (_page == 1 && filteredProducts.isEmpty) {
+        AnalyticsService().track('browse_empty_state');
+      }
     } catch (_) {
       setState(() => _browseProducts = []);
       ErrorReporter.message('browse_products_load_failed');
@@ -393,6 +424,19 @@ class _HomeScreenState extends State<HomeScreen> {
       final stock = int.tryParse((p['quantity'] ?? p['stock'] ?? '0').toString()) ?? 0;
       return stock > 0;
     }).take(10).toList();
+  }
+
+  List<Map<String, dynamic>> _becauseYouViewed() {
+    final recentIds = _recentProducts.map((e) => e['id']).whereType<int>().toSet();
+    if (recentIds.isEmpty) return [];
+    return _browseProductsAsMap().where((p) => !recentIds.contains(p['id'])).take(10).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -568,6 +612,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             icon: const Icon(Icons.mic_none),
                           ),
+                          ActionChip(
+                            label: const Text('Clear Filters'),
+                            onPressed: () {
+                              setState(() {
+                                _maxPriceFilter = null;
+                                _minDiscountFilter = 0;
+                                _etaUnder30Filter = false;
+                                _selectedSort = 'trending';
+                              });
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -615,6 +672,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                           ),
+                          ActionChip(
+                            label: const Text('Clear Filters'),
+                            onPressed: () {
+                              setState(() {
+                                _maxPriceFilter = null;
+                                _minDiscountFilter = 0;
+                                _etaUnder30Filter = false;
+                                _selectedSort = 'trending';
+                              });
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -628,6 +698,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           IconButton(
                             icon: Icon(_categoriesExpanded ? Icons.expand_less : Icons.expand_more),
                             onPressed: () => setState(() => _categoriesExpanded = !_categoriesExpanded),
+                          ),
+                          ActionChip(
+                            label: const Text('Clear Filters'),
+                            onPressed: () {
+                              setState(() {
+                                _maxPriceFilter = null;
+                                _minDiscountFilter = 0;
+                                _etaUnder30Filter = false;
+                                _selectedSort = 'trending';
+                              });
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
                           ),
                         ],
                       ),
@@ -717,6 +800,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               _loadBrowseProducts();
                             },
                           ),
+                          ActionChip(
+                            label: const Text('Clear Filters'),
+                            onPressed: () {
+                              setState(() {
+                                _maxPriceFilter = null;
+                                _minDiscountFilter = 0;
+                                _etaUnder30Filter = false;
+                                _selectedSort = 'trending';
+                              });
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -730,8 +826,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     _SectionRow(title: 'Trending in your area', products: _browseProductsAsMap().take(8).toList()),
                     _SectionRow(title: 'Selling fast near you', products: _browseProductsAsMap().reversed.take(8).toList()),
                     _SectionRow(title: 'New arrivals today', products: _browseProductsAsMap().take(8).toList()),
+                    _SectionRow(title: 'Budget Picks Under ₹499', products: _browseProductsAsMap().where((p) => (double.tryParse((p['sellingPrice'] ?? p['price'] ?? '0').toString()) ?? 0) <= 499).take(8).toList()),
+                    _SectionRow(title: 'Premium Styles Above ₹999', products: _browseProductsAsMap().where((p) => (double.tryParse((p['sellingPrice'] ?? p['price'] ?? '0').toString()) ?? 0) >= 999).take(8).toList()),
                     _SectionRow(title: 'Recently Dropped Prices', products: _recentlyDroppedPrices()),
                     _SectionRow(title: 'Back in Stock for You', products: _backInStockProducts()),
+                    _SectionRow(title: 'Because you viewed', products: _becauseYouViewed()),
+                    if (!_productLoading && _browseProducts.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: Text('No products found. Try changing search/filters.')),
+                      ),
+                    if (_hasMoreProducts && !_productLoading && _browseProducts.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Center(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              _page += 1;
+                              _loadBrowseProducts();
+                            },
+                            icon: const Icon(Icons.expand_more),
+                            label: const Text('Load more products'),
+                          ),
+                        ),
+                      ),
                     if (_recentProducts.isNotEmpty) ...[
                       const Padding(
                         padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -775,6 +893,22 @@ class _HomeScreenState extends State<HomeScreen> {
                             final product = _homeFeed!['featured'][index];
                             return _ProductCard(product: product);
                           },
+                        ),
+                      ),
+                    if (_hasMoreProducts && !_productLoading && _browseProducts.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              _page += 1;
+                              AnalyticsService().track('browse_load_more', props: {'page': _page});
+                              _loadBrowseProducts();
+                            },
+                            icon: const Icon(Icons.expand_more),
+                            label: const Text('Load more'),
+                          ),
                         ),
                       ),
                     Padding(
@@ -866,6 +1000,13 @@ class _SectionRow extends StatelessWidget {
   const _SectionRow({required this.title, required this.products});
 
   @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (products.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -894,6 +1035,13 @@ class _CategoryTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   const _CategoryTile({required this.category, required this.selected, required this.onTap});
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -931,6 +1079,13 @@ class _ProductCard extends StatelessWidget {
   const _ProductCard({required this.product});
 
   @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final images = product['images'] as List? ?? [];
     return GestureDetector(
@@ -951,11 +1106,11 @@ class _ProductCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: Container(
-                height: 140,
-                color: Colors.grey[200],
-                child: images.isNotEmpty
-                    ? Image.network(images[0], fit: BoxFit.cover, width: double.infinity)
+                child: Container(
+                  height: 140,
+                  color: Colors.grey[200],
+                  child: images.isNotEmpty
+                    ? Image.network(images[0], fit: BoxFit.cover, width: double.infinity, loadingBuilder: (c, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)))
                     : const Center(child: Icon(Icons.checkroom, size: 40, color: Colors.grey)),
               ),
             ),
@@ -990,6 +1145,13 @@ class _ProductGridItem extends StatelessWidget {
   const _ProductGridItem({required this.product});
 
   @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final images = product['images'] as List? ?? [];
     return GestureDetector(
@@ -1013,7 +1175,7 @@ class _ProductGridItem extends StatelessWidget {
                   width: double.infinity,
                   color: Colors.grey[200],
                   child: images.isNotEmpty
-                      ? Image.network(images[0], fit: BoxFit.cover)
+                      ? Image.network(images[0], fit: BoxFit.cover, loadingBuilder: (c, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)))
                       : const Center(child: Icon(Icons.checkroom, size: 40, color: Colors.grey)),
                 ),
               ),
