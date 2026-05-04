@@ -91,13 +91,21 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
                 onTap: () => Navigator.pop(ctx, ''),
               ),
               ..._nearbyAgents.map(
-                (a) => ListTile(
-                  title: Text(a['name'] ?? 'Delivery Agent'),
-                  subtitle: Text(
-                    '${a['phone'] ?? ''} - ${a['distanceKm'] ?? '-'} km - load ${a['activeTaskCount'] ?? 0}',
-                  ),
-                  onTap: () => Navigator.pop(ctx, a['agentId']?.toString() ?? ''),
-                ),
+                (a) {
+                  final score = _agentScore(a);
+                  return ListTile(
+                    title: Text(a['name'] ?? 'Delivery Agent'),
+                    subtitle: Text(
+                      '${a['phone'] ?? ''} - ${a['distanceKm'] ?? '-'} km - load ${a['activeTaskCount'] ?? 0}',
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: Colors.green.withAlpha(20), borderRadius: BorderRadius.circular(8)),
+                      child: Text('Score ${score.toStringAsFixed(1)}'),
+                    ),
+                    onTap: () => Navigator.pop(ctx, a['agentId']?.toString() ?? ''),
+                  );
+                },
               ),
             ],
           ),
@@ -121,6 +129,31 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
         SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
       );
     }
+  }
+
+  double _agentScore(dynamic agent) {
+    final distance = ((agent['distanceKm'] ?? 10) as num).toDouble();
+    final load = ((agent['activeTaskCount'] ?? 0) as num).toDouble();
+    final acceptanceRate = ((agent['acceptanceRate'] ?? 80) as num).toDouble();
+    return (acceptanceRate / 100 * 50) + ((10 - distance.clamp(0, 10)) * 3) + ((5 - load.clamp(0, 5)) * 4);
+  }
+
+  Future<void> _batchReassignDelayed() async {
+    final delayed = _tasks.where((t) => t['sla'] != null && t['sla']['level'] == 'critical').toList();
+    if (delayed.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No critical delayed tasks found')));
+      return;
+    }
+    int reassigned = 0;
+    for (final task in delayed) {
+      try {
+        await ShopApiService().put('/delivery/tasks/${task['id']}/reassign', body: {});
+        reassigned++;
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Auto-reassigned $reassigned/${delayed.length} critical tasks')));
+    _loadTasks();
   }
 
   String _agentLabel(dynamic agentId) {
@@ -183,6 +216,13 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Delivery Tasks'),
+        actions: [
+          IconButton(
+            onPressed: _batchReassignDelayed,
+            icon: const Icon(Icons.auto_fix_high),
+            tooltip: 'Batch reassign delayed tasks',
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(24),
           child: Padding(

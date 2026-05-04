@@ -21,6 +21,8 @@ dependencies:
   permission_handler: ^11.3.1
   pdf: ^3.11.3
   printing: ^5.14.2
+  qr_flutter: ^4.1.0
+  share_plus: ^10.0.2
 
 dev_dependencies:
   flutter_test:
