@@ -166,12 +166,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     await context.read<AuthProvider>().init();
   }
 
+
+
+  bool _isAddressServiceable(Map<String, dynamic> address) {
+    final pincode = (address['pincode'] ?? '').toString();
+    return pincode.length == 6;
+  }
+
   Future<bool> _validateCartBeforeOrder() async {
     final cart = context.read<CartProvider>();
     for (final item in cart.items) {
       final productRes = await ApiService().get('/products/${item.productId}');
       final product = productRes['data'] as Map<String, dynamic>;
       final latestPrice = (product['sellingPrice'] as num).toDouble();
+      final inventory = (product['inventory'] as List?) ?? const [];
+      final availableQty = inventory.isNotEmpty ? ((inventory.first['quantity'] ?? 0) as num).toInt() : 0;
+      if (availableQty < item.quantity) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Insufficient stock for ${item.name}')));
+        return false;
+      }
       if ((latestPrice - item.price).abs() > 0.01) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('One or more prices changed. Please review cart.')));
         return false;
@@ -191,6 +204,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
+    final selectedAddress = addresses[_selectedAddressIndex];
+    if (!_isAddressServiceable(selectedAddress)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address pincode is not serviceable yet.')));
+      return;
+    }
+
     final isValidCart = await _validateCartBeforeOrder();
     if (!isValidCart) return;
 
@@ -204,7 +223,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             'shopId': cart.shopId,
             'items': cart.items.map((i) => i.toOrderItem()).toList(),
             'deliveryAddress': address,
-            'paymentMethod': _paymentMethod,
+            'paymentMethod': _paymentMethod == 'cod' ? 'cod' : 'cod',
             if (cart.promoCode != null) 'promoCode': cart.promoCode,
           });
 
@@ -292,8 +311,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             isActive: _step >= 2,
             content: Column(children: [
               RadioListTile<String>(value: 'cod', groupValue: _paymentMethod, onChanged: (v) => setState(() => _paymentMethod = v!), title: const Text('Cash on Delivery')),
-              RadioListTile<String>(value: 'upi', groupValue: _paymentMethod, onChanged: (v) => setState(() => _paymentMethod = v!), title: const Text('UPI (Beta)')),
-              RadioListTile<String>(value: 'card', groupValue: _paymentMethod, onChanged: (v) => setState(() => _paymentMethod = v!), title: const Text('Card (Beta)')),
+              RadioListTile<String>(value: 'upi', groupValue: _paymentMethod, onChanged: null, title: const Text('UPI (Coming Soon)')),
+              RadioListTile<String>(value: 'card', groupValue: _paymentMethod, onChanged: null, title: const Text('Card (Coming Soon)')),
             ]),
           ),
           Step(

@@ -113,6 +113,16 @@ class CartScreen extends StatelessWidget {
                           Text('INR ${cart.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w500)),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: const [Text('Delivery Fee'), Text('INR 30.00')],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [Text('Taxes (5%)'), Text('INR ${(cart.subtotal * 0.05).toStringAsFixed(2)}')],
+                      ),
                       if (cart.discount > 0) ...[
                         const SizedBox(height: 4),
                         Row(
@@ -128,7 +138,7 @@ class CartScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                          Text('INR ${cart.total.toStringAsFixed(2)}',
+                          Text('INR ${(cart.total + 30 + cart.subtotal * 0.05).toStringAsFixed(2)}',
                               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                         ],
                       ),
