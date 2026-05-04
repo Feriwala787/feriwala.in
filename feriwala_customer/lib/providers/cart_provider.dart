@@ -35,6 +35,7 @@ class CartItem {
 
 class CartProvider extends ChangeNotifier {
   final List<CartItem> _items = [];
+  final List<CartItem> _savedItems = [];
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -46,9 +47,22 @@ class CartProvider extends ChangeNotifier {
       _promoCode = map['promoCode'] as String?;
       _discount = (map['discount'] as num?)?.toDouble() ?? 0;
       final items = (map['items'] as List? ?? []);
+      final savedItems = (map['savedItems'] as List? ?? []);
       _items.clear();
       for (final i in items) {
         _items.add(CartItem(
+          productId: i['productId'],
+          name: i['name'],
+          price: (i['price'] as num).toDouble(),
+          image: i['image'],
+          size: i['size'],
+          color: i['color'],
+          quantity: i['quantity'] ?? 1,
+        ));
+      }
+      _savedItems.clear();
+      for (final i in savedItems) {
+        _savedItems.add(CartItem(
           productId: i['productId'],
           name: i['name'],
           price: (i['price'] as num).toDouble(),
@@ -79,6 +93,15 @@ class CartProvider extends ChangeNotifier {
         'color': i.color,
         'quantity': i.quantity,
       }).toList(),
+      'savedItems': _savedItems.map((i) => {
+        'productId': i.productId,
+        'name': i.name,
+        'price': i.price,
+        'image': i.image,
+        'size': i.size,
+        'color': i.color,
+        'quantity': i.quantity,
+      }).toList(),
     };
     await prefs.setString('cart_state', jsonEncode(map));
   }
@@ -87,6 +110,7 @@ class CartProvider extends ChangeNotifier {
   double _discount = 0;
 
   List<CartItem> get items => List.unmodifiable(_items);
+  List<CartItem> get savedItems => List.unmodifiable(_savedItems);
   int? get shopId => _shopId;
   String? get promoCode => _promoCode;
   double get discount => _discount;
@@ -147,6 +171,25 @@ class CartProvider extends ChangeNotifier {
       _promoCode = null;
       _discount = 0;
     }
+    notifyListeners();
+    _persist();
+  }
+
+  void moveToSaved(int index) {
+    final item = _items.removeAt(index);
+    _savedItems.add(item);
+    if (_items.isEmpty) {
+      _shopId = null;
+      _promoCode = null;
+      _discount = 0;
+    }
+    notifyListeners();
+    _persist();
+  }
+
+  void moveToCartFromSaved(int index) {
+    final item = _savedItems.removeAt(index);
+    _items.add(item);
     notifyListeners();
     _persist();
   }

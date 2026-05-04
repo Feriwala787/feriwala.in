@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 import '../services/error_reporter.dart';
@@ -41,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedOccasion;
   int _page = 1;
   bool _hasMoreProducts = true;
+  Timer? _searchDebounce;
 
   static const double _maxWarehouseDistanceKm = 10;
 
@@ -193,6 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _updateSearchSuggestions(String input) {
+    _searchDebounce?.cancel();
     final q = input.toLowerCase().trim();
     if (q.isEmpty) {
       setState(() => _searchSuggestions = []);
@@ -212,6 +215,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     setState(() => _searchSuggestions = suggestions.toList());
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _page = 1;
+      _loadBrowseProducts();
+    });
   }
 
   List<_CategoryTileData> _mergedCategories() {
@@ -292,11 +300,15 @@ class _HomeScreenState extends State<HomeScreen> {
           .whereType<Map>()
           .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
           .toList();
+      final filteredProducts = _applyLocalFilters(products);
       setState(() {
-        _browseProducts = _page == 1 ? _applyLocalFilters(products) : [..._browseProducts, ..._applyLocalFilters(products)];
+        _browseProducts = _page == 1 ? filteredProducts : [..._browseProducts, ...filteredProducts];
         _hasMoreProducts = products.length >= 20;
       });
       AnalyticsService().track('browse_products_loaded', props: {'page': _page, 'count': products.length});
+      if (_page == 1 && filteredProducts.isEmpty) {
+        AnalyticsService().track('browse_empty_state');
+      }
     } catch (_) {
       setState(() => _browseProducts = []);
       ErrorReporter.message('browse_products_load_failed');
@@ -393,6 +405,13 @@ class _HomeScreenState extends State<HomeScreen> {
       final stock = int.tryParse((p['quantity'] ?? p['stock'] ?? '0').toString()) ?? 0;
       return stock > 0;
     }).take(10).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -568,6 +587,19 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             icon: const Icon(Icons.mic_none),
                           ),
+                          ActionChip(
+                            label: const Text('Clear Filters'),
+                            onPressed: () {
+                              setState(() {
+                                _maxPriceFilter = null;
+                                _minDiscountFilter = 0;
+                                _etaUnder30Filter = false;
+                                _selectedSort = 'trending';
+                              });
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -615,6 +647,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                           ),
+                          ActionChip(
+                            label: const Text('Clear Filters'),
+                            onPressed: () {
+                              setState(() {
+                                _maxPriceFilter = null;
+                                _minDiscountFilter = 0;
+                                _etaUnder30Filter = false;
+                                _selectedSort = 'trending';
+                              });
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -628,6 +673,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           IconButton(
                             icon: Icon(_categoriesExpanded ? Icons.expand_less : Icons.expand_more),
                             onPressed: () => setState(() => _categoriesExpanded = !_categoriesExpanded),
+                          ),
+                          ActionChip(
+                            label: const Text('Clear Filters'),
+                            onPressed: () {
+                              setState(() {
+                                _maxPriceFilter = null;
+                                _minDiscountFilter = 0;
+                                _etaUnder30Filter = false;
+                                _selectedSort = 'trending';
+                              });
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
                           ),
                         ],
                       ),
@@ -717,6 +775,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               _loadBrowseProducts();
                             },
                           ),
+                          ActionChip(
+                            label: const Text('Clear Filters'),
+                            onPressed: () {
+                              setState(() {
+                                _maxPriceFilter = null;
+                                _minDiscountFilter = 0;
+                                _etaUnder30Filter = false;
+                                _selectedSort = 'trending';
+                              });
+                              _page = 1;
+                              _loadBrowseProducts();
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -732,6 +803,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     _SectionRow(title: 'New arrivals today', products: _browseProductsAsMap().take(8).toList()),
                     _SectionRow(title: 'Recently Dropped Prices', products: _recentlyDroppedPrices()),
                     _SectionRow(title: 'Back in Stock for You', products: _backInStockProducts()),
+                    if (!_productLoading && _browseProducts.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: Text('No products found. Try changing search/filters.')),
+                      ),
+                    if (_hasMoreProducts && !_productLoading && _browseProducts.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Center(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              _page += 1;
+                              _loadBrowseProducts();
+                            },
+                            icon: const Icon(Icons.expand_more),
+                            label: const Text('Load more products'),
+                          ),
+                        ),
+                      ),
                     if (_recentProducts.isNotEmpty) ...[
                       const Padding(
                         padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -775,6 +865,22 @@ class _HomeScreenState extends State<HomeScreen> {
                             final product = _homeFeed!['featured'][index];
                             return _ProductCard(product: product);
                           },
+                        ),
+                      ),
+                    if (_hasMoreProducts && !_productLoading && _browseProducts.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              _page += 1;
+                              AnalyticsService().track('browse_load_more', props: {'page': _page});
+                              _loadBrowseProducts();
+                            },
+                            icon: const Icon(Icons.expand_more),
+                            label: const Text('Load more'),
+                          ),
                         ),
                       ),
                     Padding(
@@ -866,6 +972,13 @@ class _SectionRow extends StatelessWidget {
   const _SectionRow({required this.title, required this.products});
 
   @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (products.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -894,6 +1007,13 @@ class _CategoryTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   const _CategoryTile({required this.category, required this.selected, required this.onTap});
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -929,6 +1049,13 @@ class _CategoryTile extends StatelessWidget {
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductCard({required this.product});
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -988,6 +1115,13 @@ class _ProductCard extends StatelessWidget {
 class _ProductGridItem extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductGridItem({required this.product});
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
