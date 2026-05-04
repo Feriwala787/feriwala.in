@@ -20,9 +20,6 @@ class RequiredPermissionsService {
 
     final result = await permission.request();
     if (result.isGranted) return;
-    if (result.isPermanentlyDenied) {
-      await openAppSettings();
-    }
 
     debugPrint('[Permissions] $permission denied. $feature may be limited.');
   }
