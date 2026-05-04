@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/token_storage_service.dart';
 
 class DeliveryAuthProvider extends ChangeNotifier {
   final DeliveryApiService _api = DeliveryApiService();
@@ -16,8 +17,7 @@ class DeliveryAuthProvider extends ChangeNotifier {
 
   Future<void> init() async {
     await _api.init();
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('delivery_access_token');
+    final token = await TokenStorageService.instance.readAccessToken();
     if (token != null) {
       try {
         final res = await _api.get('/auth/profile');
@@ -43,6 +43,7 @@ class DeliveryAuthProvider extends ChangeNotifier {
       if (_user!['role'] != 'delivery_agent') throw Exception('Delivery agent access only');
       await _api.setToken(res['data']['accessToken']);
       final prefs = await SharedPreferences.getInstance();
+      await TokenStorageService.instance.writeRefreshToken(res['data']['refreshToken']);
       await prefs.setString('delivery_refresh_token', res['data']['refreshToken']);
       _isAuthenticated = true;
     } finally {

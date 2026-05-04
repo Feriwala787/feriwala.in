@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'token_storage_service.dart';
 import 'error_reporter.dart';
 
 class DeliveryApiService {
@@ -12,8 +13,7 @@ class DeliveryApiService {
   String? _token;
 
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('delivery_access_token');
+    _token = await TokenStorageService.instance.readAccessToken();
   }
 
   Map<String, String> get _headers => {
@@ -23,21 +23,18 @@ class DeliveryApiService {
 
   Future<void> setToken(String token) async {
     _token = token;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('delivery_access_token', token);
+    await TokenStorageService.instance.writeAccessToken(token);
   }
 
   Future<void> clearToken() async {
     _token = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('delivery_access_token');
-    await prefs.remove('delivery_refresh_token');
+    await TokenStorageService.instance.clearTokens();
   }
 
   Future<bool> _tryRefreshToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final refreshToken = prefs.getString('delivery_refresh_token');
+      final refreshToken = await TokenStorageService.instance.readRefreshToken() ?? prefs.getString('delivery_refresh_token');
       if (refreshToken == null) return false;
 
       final response = await http.post(
@@ -54,6 +51,7 @@ class DeliveryApiService {
 
       await setToken(accessToken.toString());
       if (newRefreshToken != null) {
+        await TokenStorageService.instance.writeRefreshToken(newRefreshToken.toString());
         await prefs.setString('delivery_refresh_token', newRefreshToken.toString());
       }
       return true;

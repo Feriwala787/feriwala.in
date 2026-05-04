@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 class ErrorReporter {
+  static bool enableDebugLogs = kDebugMode;
   static final _sensitivePatterns = <RegExp>[
     RegExp(r'Bearer\s+[A-Za-z0-9\-\._~\+\/]+=*', caseSensitive: false),
     RegExp(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'),
@@ -16,11 +17,13 @@ class ErrorReporter {
   }
 
   static void report(Object error, StackTrace stackTrace, {String? context}) {
+    if (!enableDebugLogs) return;
     debugPrint('[delivery] ${context ?? 'error'}: ${sanitize(error.toString())}');
     debugPrintStack(stackTrace: stackTrace);
   }
 
   static void message(String message) {
+    if (!enableDebugLogs) return;
     debugPrint('[delivery] ${sanitize(message)}');
   }
 }

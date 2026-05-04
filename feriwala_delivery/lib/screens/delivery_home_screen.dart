@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/delivery_auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/offline_action_queue_service.dart';
 import '../services/realtime_task_service.dart';
 import '../services/analytics_service.dart';
+import '../services/token_storage_service.dart';
 
 class DeliveryHomeScreen extends StatefulWidget {
   const DeliveryHomeScreen({super.key});
@@ -64,8 +64,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
 
 
   Future<void> _initRealtimeSync() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('delivery_access_token');
+    final token = await TokenStorageService.instance.readAccessToken();
     if (token == null) return;
 
     RealtimeTaskService.instance.connect(
