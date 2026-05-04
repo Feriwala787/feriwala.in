@@ -2,8 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/delivery_auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/offline_action_queue_service.dart';
+import '../services/realtime_task_service.dart';
+import '../services/analytics_service.dart';
 
 class DeliveryHomeScreen extends StatefulWidget {
   const DeliveryHomeScreen({super.key});
@@ -12,23 +17,82 @@ class DeliveryHomeScreen extends StatefulWidget {
   State<DeliveryHomeScreen> createState() => _DeliveryHomeScreenState();
 }
 
-class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
-  List<dynamic> _tasks = [];
+class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBindingObserver {
+  static const _closedTaskStatuses = {'completed', 'cancelled', 'failed'};
+
+  List<dynamic> _activeTasks = [];
+  List<dynamic> _completedTasks = [];
   bool _loading = true;
+  String? _loadError;
+  DateTime? _lastSyncedAt;
   int _currentIndex = 0;
+  int _queuedActionCount = 0;
   Timer? _locationSyncTimer;
+  Timer? _taskPollingTimer;
+  final Set<int> _acceptingTaskIds = <int>{};
+  final DeliveryApiService _apiService = DeliveryApiService();
+  bool _isLoadingTasks = false;
+  bool _queuedTaskRefresh = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadTasks();
     _startLocationSync();
+    _startTaskPolling();
+    _initRealtimeSync();
+    _refreshQueuedActionCount();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _locationSyncTimer?.cancel();
+    _taskPollingTimer?.cancel();
+    RealtimeTaskService.instance.disconnect();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadTasks(showLoader: false);
+      _pushLocationIfOnline();
+    }
+  }
+
+
+  Future<void> _initRealtimeSync() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('delivery_access_token');
+    if (token == null) return;
+
+    RealtimeTaskService.instance.connect(
+      token: token,
+      onTaskEvent: () => _loadTasks(showLoader: false),
+    );
+  }
+
+  Future<void> _refreshQueuedActionCount() async {
+    final count = await OfflineActionQueueService.instance.pendingCount();
+    if (mounted) setState(() => _queuedActionCount = count);
+  }
+
+  Future<void> _processOfflineQueueIfOnline() async {
+    if (!context.read<DeliveryAuthProvider>().isOnline) return;
+    await OfflineActionQueueService.instance.processQueue();
+    await _refreshQueuedActionCount();
+  }
+
+  void _startTaskPolling() {
+    _taskPollingTimer?.cancel();
+    _taskPollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (context.read<DeliveryAuthProvider>().isOnline) {
+        _processOfflineQueueIfOnline();
+        _loadTasks(showLoader: false);
+      }
+    });
   }
 
   void _startLocationSync() {
@@ -50,30 +114,133 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
 
+    final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
     try {
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      await DeliveryApiService().put('/delivery/location', body: {
+      await _apiService.put('/delivery/location', body: {
         'latitude': pos.latitude,
         'longitude': pos.longitude,
       });
-    } catch (_) {}
-  }
-
-  Future<void> _loadTasks() async {
-    try {
-      final res = await DeliveryApiService().get('/delivery/my-tasks');
-      setState(() { _tasks = res['data'] ?? []; _loading = false; });
-    } catch (e) {
-      setState(() => _loading = false);
+    } catch (_) {
+      await OfflineActionQueueService.instance.enqueuePut(
+        endpoint: '/delivery/location',
+        body: {'latitude': pos.latitude, 'longitude': pos.longitude},
+      );
+      await _refreshQueuedActionCount();
     }
   }
 
-  List<dynamic> get _activeTasks => _tasks.where((t) => !['completed', 'cancelled', 'failed'].contains(t['status'])).toList();
-  List<dynamic> get _completedTasks => _tasks.where((t) => ['completed', 'cancelled', 'failed'].contains(t['status'])).toList();
+  void _splitTasks(List<dynamic> tasks) {
+    _activeTasks = [];
+    _completedTasks = [];
+
+    for (final task in tasks) {
+      final status = task['status'];
+      if (_closedTaskStatuses.contains(status)) {
+        _completedTasks.add(task);
+      } else {
+        _activeTasks.add(task);
+      }
+    }
+  }
+
+  Future<void> _loadTasks({bool showLoader = true}) async {
+    if (_isLoadingTasks) {
+      _queuedTaskRefresh = true;
+      return;
+    }
+
+    _isLoadingTasks = true;
+
+    if (showLoader && mounted) {
+      setState(() => _loading = true);
+    }
+
+    try {
+      final res = await _apiService.get('/delivery/my-tasks');
+      if (!mounted) return;
+
+      final tasks = res['data'] ?? [];
+      setState(() {
+        _splitTasks(tasks);
+        _loading = false;
+        _loadError = null;
+        _lastSyncedAt = DateTime.now();
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = 'Unable to refresh tasks. Please try again.';
+        });
+      }
+    } finally {
+      _isLoadingTasks = false;
+      if (_queuedTaskRefresh) {
+        _queuedTaskRefresh = false;
+        _loadTasks(showLoader: false);
+      }
+    }
+  }
+
+  Future<void> _acceptTask(int taskId) async {
+    if (_acceptingTaskIds.contains(taskId)) return;
+
+    setState(() => _acceptingTaskIds.add(taskId));
+    try {
+      final idempotencyKey = 'accept-$taskId-${DateTime.now().millisecondsSinceEpoch}';
+      await _apiService.put('/delivery/tasks/$taskId/accept', extraHeaders: {'X-Idempotency-Key': idempotencyKey});
+      await _loadTasks(showLoader: false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Task accepted successfully.')),
+        );
+        AnalyticsService.instance.track('task_accept_success', props: {'taskId': taskId});
+      }
+    } catch (e) {
+      await OfflineActionQueueService.instance.enqueuePut(
+        endpoint: '/delivery/tasks/$taskId/accept',
+        body: const {},
+        id: 'accept-$taskId',
+      );
+      await _refreshQueuedActionCount();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network issue: action queued and will retry automatically.')),
+        );
+        AnalyticsService.instance.track('task_accept_queued', props: {'taskId': taskId});
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _acceptingTaskIds.remove(taskId));
+      }
+    }
+  }
+
+  Future<void> _openMapsForTask(Map<String, dynamic> task) async {
+    final isDeliveryLeg = task['status'] == 'picked_up' || task['status'] == 'in_transit';
+    final location = ((isDeliveryLeg ? task['dropLocation'] : task['pickupLocation']) as Map?) ?? const {};
+    final lat = location['latitude'];
+    final lng = location['longitude'];
+
+    if (lat is! num || lng is! num) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location coordinates not available for this task.')),
+        );
+      }
+      return;
+    }
+
+    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${lat.toDouble()},${lng.toDouble()}');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<DeliveryAuthProvider>();
+    final assignedCount = _activeTasks.where((t) => t['status'] == 'assigned').length;
 
     return Scaffold(
       appBar: AppBar(
@@ -91,6 +258,18 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                 },
                 activeThumbColor: Colors.green,
               ),
+              if (_queuedActionCount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Center(
+                    child: Text('Queued: $_queuedActionCount', style: const TextStyle(fontSize: 11, color: Colors.orange)),
+                  ),
+                ),
+              IconButton(
+                tooltip: 'Refresh tasks',
+                onPressed: () => _loadTasks(showLoader: false),
+                icon: const Icon(Icons.refresh),
+              ),
             ],
           ),
         ],
@@ -101,6 +280,8 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
           // Active tasks
           _loading
               ? const Center(child: CircularProgressIndicator())
+              : _loadError != null
+                  ? _ErrorState(message: _loadError!, onRetry: _loadTasks)
               : RefreshIndicator(
                   onRefresh: _loadTasks,
                   child: _activeTasks.isEmpty
@@ -110,9 +291,22 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
+                                if (assignedCount > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    decoration: BoxDecoration(color: Colors.orange.withAlpha(30), borderRadius: BorderRadius.circular(12)),
+                                    child: Text('$assignedCount new task${assignedCount > 1 ? 's' : ''} waiting',
+                                        style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w600)),
+                                  ),
                                 Icon(auth.isOnline ? Icons.hourglass_empty : Icons.cloud_off, size: 64, color: Colors.grey),
                                 const SizedBox(height: 16),
                                 Text(auth.isOnline ? 'Waiting for tasks...' : 'Go online to receive tasks'),
+                                if (_lastSyncedAt != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text('Last synced: ${_lastSyncedAt!.hour.toString().padLeft(2, '0')}:${_lastSyncedAt!.minute.toString().padLeft(2, '0')}',
+                                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                ],
                               ],
                             ),
                           ),
@@ -127,15 +321,10 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                               _loadTasks();
                             },
                             onAccept: _activeTasks[index]['status'] == 'assigned'
-                                ? () async {
-                                    try {
-                                      await DeliveryApiService().put('/delivery/tasks/${_activeTasks[index]['id']}/accept');
-                                      _loadTasks();
-                                    } catch (e) {
-                                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                                    }
-                                  }
+                                ? () => _acceptTask((_activeTasks[index]['id'] as num).toInt())
                                 : null,
+                            isAccepting: _acceptingTaskIds.contains((_activeTasks[index]['id'] as num).toInt()),
+                            onNavigate: () => _openMapsForTask(_activeTasks[index]),
                           ),
                         ),
                 ),
@@ -143,13 +332,23 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
           // History
           _loading
               ? const Center(child: CircularProgressIndicator())
-              : _completedTasks.isEmpty
-                  ? const Center(child: Text('No task history'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _completedTasks.length,
-                      itemBuilder: (context, index) => _TaskCard(task: _completedTasks[index], onTap: () {}),
-                    ),
+              : RefreshIndicator(
+                  onRefresh: _loadTasks,
+                  child: _completedTasks.isEmpty
+                      ? ListView(
+                          children: const [
+                            SizedBox(
+                              height: 400,
+                              child: Center(child: Text('No task history')),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _completedTasks.length,
+                          itemBuilder: (context, index) => _TaskCard(task: _completedTasks[index], onTap: () {}),
+                        ),
+                ),
 
           // Profile
           _ProfileTab(auth: auth),
@@ -172,7 +371,9 @@ class _TaskCard extends StatelessWidget {
   final Map<String, dynamic> task;
   final VoidCallback onTap;
   final VoidCallback? onAccept;
-  const _TaskCard({required this.task, required this.onTap, this.onAccept});
+  final VoidCallback? onNavigate;
+  final bool isAccepting;
+  const _TaskCard({required this.task, required this.onTap, this.onAccept, this.onNavigate, this.isAccepting = false});
 
   @override
   Widget build(BuildContext context) {
@@ -227,16 +428,43 @@ class _TaskCard extends StatelessWidget {
                 Text('ETA: ${task['estimatedMinutes']} min | ${task['distanceKm'] ?? '-'} km'),
               if (onAccept != null) ...[
                 const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: onAccept,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isAccepting ? null : onAccept,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: isAccepting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Accept Task'),
+                      ),
                     ),
-                    child: const Text('Accept Task'),
+                    if (onNavigate != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: onNavigate,
+                        icon: const Icon(Icons.navigation),
+                        style: IconButton.styleFrom(backgroundColor: const Color(0xFFF47721), foregroundColor: Colors.white),
+                      ),
+                    ],
+                  ],
+                ),
+              ] else if (onNavigate != null) ...[
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: onNavigate,
+                    icon: const Icon(Icons.navigation),
+                    label: const Text('Navigate'),
                   ),
                 ),
               ],
@@ -282,6 +510,33 @@ class _ProfileTab extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final Future<void> Function() onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off, size: 56, color: Colors.redAccent),
+            const SizedBox(height: 12),
+            const Text('Could not load tasks', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(message, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Try again')),
+          ],
+        ),
       ),
     );
   }

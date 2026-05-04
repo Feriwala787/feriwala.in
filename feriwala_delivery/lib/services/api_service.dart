@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'error_reporter.dart';
 
 class DeliveryApiService {
   static final DeliveryApiService _instance = DeliveryApiService._internal();
@@ -80,19 +81,19 @@ class DeliveryApiService {
   }
 
   Future<Map<String, dynamic>> post(String endpoint,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, Map<String, String>? extraHeaders}) async {
     return _requestWithAutoRefresh(() => http.post(
           Uri.parse('$baseUrl$endpoint'),
-          headers: _headers,
+          headers: {..._headers, ...?extraHeaders},
           body: jsonEncode(body),
         ));
   }
 
   Future<Map<String, dynamic>> put(String endpoint,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, Map<String, String>? extraHeaders}) async {
     return _requestWithAutoRefresh(() => http.put(
           Uri.parse('$baseUrl$endpoint'),
-          headers: _headers,
+          headers: {..._headers, ...?extraHeaders},
           body: jsonEncode(body),
         ));
   }
@@ -100,6 +101,7 @@ class DeliveryApiService {
   Map<String, dynamic> _handleResponse(http.Response response) {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode >= 200 && response.statusCode < 300) return data;
+    ErrorReporter.message('API error ${response.statusCode}: ${data['message'] ?? 'Request failed'}');
     throw Exception(data['message'] ?? 'Request failed');
   }
 }
