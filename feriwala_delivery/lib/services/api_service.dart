@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'token_storage_service.dart';
 import 'error_reporter.dart';
+import 'security_posture_service.dart';
 
 class DeliveryApiService {
   static final DeliveryApiService _instance = DeliveryApiService._internal();
@@ -59,6 +60,9 @@ class DeliveryApiService {
 
   Future<Map<String, dynamic>> _requestWithAutoRefresh(
       Future<http.Response> Function() requestFn) async {
+    if (!SecurityPostureService.instance.allowSensitiveNetworkCalls) {
+      throw Exception('Security posture check failed');
+    }
     final response = await requestFn();
     if (response.statusCode != 401) return _handleResponse(response);
 

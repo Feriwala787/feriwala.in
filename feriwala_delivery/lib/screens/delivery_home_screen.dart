@@ -27,6 +27,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
   DateTime? _lastSyncedAt;
   int _currentIndex = 0;
   int _queuedActionCount = 0;
+  int _lastTaskSequence = 0;
   Timer? _locationSyncTimer;
   Timer? _taskPollingTimer;
   final Set<int> _acceptingTaskIds = <int>{};
@@ -69,7 +70,11 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
 
     RealtimeTaskService.instance.connect(
       token: token,
-      onTaskEvent: () => _loadTasks(showLoader: false),
+      onTaskEvent: (sequence) {
+        if (sequence != null && sequence < _lastTaskSequence) return;
+        if (sequence != null) _lastTaskSequence = sequence;
+        _loadTasks(showLoader: false);
+      },
     );
   }
 

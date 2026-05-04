@@ -37,7 +37,7 @@ class RealtimeTaskService {
   RealtimeSocket? _socket;
   RealtimeSocket Function(String url, Map<String, dynamic> options)? socketFactory;
 
-  void connect({required String token, required void Function() onTaskEvent}) {
+  void connect({required String token, required void Function(int? sequence) onTaskEvent}) {
     _socket?.dispose();
 
     final url = DeliveryApiService.baseUrl.replaceAll('/api', '');
@@ -45,10 +45,20 @@ class RealtimeTaskService {
     _socket = (socketFactory ?? (u, o) => IoRealtimeSocket(io.io(u, o)))(url, options);
 
     _socket!.onConnect((_) {});
-    _socket!.on('task_assigned', (_) => onTaskEvent());
-    _socket!.on('task_updated', (_) => onTaskEvent());
-    _socket!.on('delivery_task_update', (_) => onTaskEvent());
+    _socket!.on('task_assigned', (payload) => onTaskEvent(_extractSequence(payload)));
+    _socket!.on('task_updated', (payload) => onTaskEvent(_extractSequence(payload)));
+    _socket!.on('delivery_task_update', (payload) => onTaskEvent(_extractSequence(payload)));
     _socket!.connect();
+  }
+
+  int? _extractSequence(dynamic payload) {
+    if (payload is Map && payload['sequence'] is num) {
+      return (payload['sequence'] as num).toInt();
+    }
+    if (payload is Map && payload['version'] is num) {
+      return (payload['version'] as num).toInt();
+    }
+    return null;
   }
 
   void disconnect() {

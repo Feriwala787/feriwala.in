@@ -32,7 +32,7 @@ void main() {
     service.socketFactory = (_, __) => socket;
 
     var callbackCount = 0;
-    service.connect(token: 't', onTaskEvent: () => callbackCount++);
+    service.connect(token: 't', onTaskEvent: (_) => callbackCount++);
 
     expect(socket.connected, true);
     socket.emit('task_assigned');
