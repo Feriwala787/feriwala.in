@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/security_guard_service.dart';
 
 class ShopPromosScreen extends StatefulWidget {
   const ShopPromosScreen({super.key});
@@ -213,14 +214,28 @@ class _ShopPromosScreenState extends State<ShopPromosScreen> {
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) async {
                             if (value == 'toggle') {
-                              await ShopApiService().put('/promos/${p['id']}', body: {'isActive': !(p['isActive'] ?? false)});
-                              _loadPromos();
+                              final verified = await SecurityGuardService().guardAction(
+                                context,
+                                title: 'Promo security check',
+                                subtitle: 'Enter PIN to activate/deactivate this promo.',
+                              );
+                              if (verified) {
+                                await ShopApiService().put('/promos/${p['id']}', body: {'isActive': !(p['isActive'] ?? false)});
+                                _loadPromos();
+                              }
                             }
                             if (value == 'edit') _showPromoDialog(existing: p);
                             if (value == 'duplicate') _showPromoDialog(existing: p, duplicate: true);
                             if (value == 'archive') {
-                              await ShopApiService().put('/promos/${p['id']}', body: {'isArchived': true, 'isActive': false});
-                              _loadPromos();
+                              final verified = await SecurityGuardService().guardAction(
+                                context,
+                                title: 'Archive promo',
+                                subtitle: 'Enter PIN to archive this promo.',
+                              );
+                              if (verified) {
+                                await ShopApiService().put('/promos/${p['id']}', body: {'isArchived': true, 'isActive': false});
+                                _loadPromos();
+                              }
                             }
                           },
                           itemBuilder: (_) => const [
