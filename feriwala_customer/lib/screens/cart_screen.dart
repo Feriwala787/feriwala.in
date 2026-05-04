@@ -71,7 +71,7 @@ class CartScreen extends StatelessWidget {
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.add_circle, color: Color(0xFFF47721)),
-                                    onPressed: () => cart.updateQuantity(index, item.quantity + 1),
+                                    onPressed: item.quantity >= 10 ? null : () => cart.updateQuantity(index, item.quantity + 1),
                                     iconSize: 28,
                                   ),
                                   Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
