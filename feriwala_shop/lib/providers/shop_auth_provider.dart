@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/push_notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ShopAuthProvider extends ChangeNotifier {
@@ -8,6 +9,7 @@ class ShopAuthProvider extends ChangeNotifier {
   int? _shopId;
   bool _isLoading = false;
   bool _isAuthenticated = false;
+  final PushNotificationService _pushService = PushNotificationService();
 
   Map<String, dynamic>? get user => _user;
   int? get shopId => _shopId;
@@ -25,6 +27,9 @@ class ShopAuthProvider extends ChangeNotifier {
         _shopId = _user?['shopId'];
         if (_user?['role'] == 'shop_admin') {
           _isAuthenticated = true;
+          if (_shopId != null) {
+            _pushService.initForShopUser(shopId: _shopId!, role: _user?['role'] ?? 'shop_admin');
+          }
         } else {
           await _api.clearToken();
         }
@@ -47,6 +52,9 @@ class ShopAuthProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('shop_refresh_token', res['data']['refreshToken']);
       _isAuthenticated = true;
+      if (_shopId != null) {
+        _pushService.initForShopUser(shopId: _shopId!, role: _user?['role'] ?? 'shop_admin');
+      }
     } finally {
       _isLoading = false;
       notifyListeners();

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:csv/csv.dart';
 import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
 import '../services/api_service.dart';
@@ -182,6 +184,44 @@ class _ShopInventoryScreenState extends State<ShopInventoryScreen> {
     _loadProducts();
   }
 
+  Future<void> _importCsvUpdate() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['csv']);
+    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+    final content = String.fromCharCodes(result.files.first.bytes!);
+    final rows = const CsvToListConverter(eol: '\n').convert(content);
+    if (rows.length <= 1) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('CSV has no data rows')));
+      return;
+    }
+
+    int success = 0;
+    for (int i = 1; i < rows.length; i++) {
+      final row = rows[i];
+      if (row.length < 3) continue;
+      final sku = row[0].toString();
+      final qty = int.tryParse(row[1].toString());
+      final threshold = int.tryParse(row[2].toString());
+      if (qty == null || threshold == null) continue;
+      final product = _products.cast<Map<String, dynamic>?>().firstWhere(
+            (p) => p?['sku']?.toString() == sku,
+            orElse: () => null,
+          );
+      if (product == null) continue;
+      try {
+        await ShopApiService().put('/products/${product['id']}/inventory', body: {
+          'quantity': qty,
+          'lowStockThreshold': threshold,
+          'reason': 'manual_correction',
+        });
+        success++;
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('CSV import done. Updated $success product(s).')));
+    _loadProducts();
+  }
+
   @override
   Widget build(BuildContext context) {
     final displayProducts = _onlyLowStock ? _products.where(_isLow).toList() : _products;
@@ -192,11 +232,7 @@ class _ShopInventoryScreenState extends State<ShopInventoryScreen> {
         actions: [
           IconButton(onPressed: _restockLowStockQueue, icon: const Icon(Icons.playlist_add_check), tooltip: 'One-click restock plan'),
           IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('CSV import/update scaffold ready (backend upload endpoint required).')),
-              );
-            },
+            onPressed: _importCsvUpdate,
             icon: const Icon(Icons.upload_file),
             tooltip: 'CSV bulk import',
           ),

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/offline_action_queue_service.dart';
 import '../services/shop_socket_service.dart';
+import '../services/security_guard_service.dart';
 
 class ShopOrdersScreen extends StatefulWidget {
   const ShopOrdersScreen({super.key});
@@ -26,6 +28,7 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
   DateTime? _lastSyncAt;
   bool _isSocketLive = false;
   StreamSubscription<bool>? _socketStateSub;
+  int _pendingOfflineActions = 0;
 
   @override
   void initState() {
@@ -40,7 +43,22 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
     });
     _loadOrders();
     _setupRealtime();
+    _refreshPendingQueueCount();
     _pollTimer = Timer.periodic(const Duration(seconds: 25), (_) => _loadOrders(silent: true));
+  }
+
+  Future<void> _refreshPendingQueueCount() async {
+    final count = await OfflineActionQueueService().pendingCount();
+    if (!mounted) return;
+    setState(() => _pendingOfflineActions = count);
+  }
+
+  Future<void> _syncOfflineQueue() async {
+    final synced = await OfflineActionQueueService().processQueue();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Synced $synced offline action(s).')));
+    _refreshPendingQueueCount();
+    _loadOrders(silent: true);
   }
 
   Future<void> _setupRealtime() async {
@@ -107,9 +125,14 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
       );
       _loadOrders(silent: true);
     } catch (e) {
+      await OfflineActionQueueService().enqueue(
+        endpoint: '/orders/$orderId/status',
+        body: {'status': newStatus},
+      );
       if (!mounted) return;
+      _refreshPendingQueueCount();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        const SnackBar(content: Text('No internet/server issue: action queued for sync'), backgroundColor: Colors.orange),
       );
     }
   }
@@ -194,6 +217,12 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
       appBar: AppBar(
         title: const Text('Orders'),
         actions: [
+          if (_pendingOfflineActions > 0)
+            IconButton(
+              onPressed: _syncOfflineQueue,
+              icon: const Icon(Icons.sync),
+              tooltip: 'Sync offline queue',
+            ),
           IconButton(onPressed: _confirmAllPending, icon: const Icon(Icons.done_all), tooltip: 'Confirm all pending'),
         ],
         bottom: TabBar(
@@ -324,7 +353,14 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
                                               child: OutlinedButton(
                                                 onPressed: () async {
                                                   final ok = await _confirmDangerAction('Reject order?', 'This cannot be easily undone.');
-                                                  if (ok) _updateStatus(order['id'], 'cancelled');
+                                                  if (ok) {
+                                                    final verified = await SecurityGuardService().guardAction(
+                                                      context,
+                                                      title: 'Security confirmation required',
+                                                      subtitle: 'Enter PIN to reject this order.',
+                                                    );
+                                                    if (verified) _updateStatus(order['id'], 'cancelled');
+                                                  }
                                                 },
                                                 style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                                                 child: const Text('Reject'),
