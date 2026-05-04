@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/shop_socket_service.dart';
 
 class DeliveryManagementScreen extends StatefulWidget {
   const DeliveryManagementScreen({super.key});
@@ -15,11 +17,26 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   List<dynamic> _nearbyAgents = [];
   bool _loading = true;
   String? _errorMessage;
+  bool _isSocketLive = false;
+  StreamSubscription<bool>? _socketStateSub;
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
+    _setupRealtime();
+  }
+
+  Future<void> _setupRealtime() async {
+    final shopId = context.read<ShopAuthProvider>().shopId;
+    if (shopId == null) return;
+    final socket = ShopSocketService();
+    await socket.connect(shopId: shopId);
+    socket.onDeliveryUpdated((_) => _loadTasks());
+    _socketStateSub = socket.connectionStateStream.listen((connected) {
+      if (!mounted) return;
+      setState(() => _isSocketLive = connected);
+    });
   }
 
   Future<void> _loadTasks() async {
@@ -164,7 +181,19 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Delivery Tasks')),
+      appBar: AppBar(
+        title: const Text('Delivery Tasks'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(24),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              _isSocketLive ? 'Live: socket connected' : 'Live: polling fallback',
+              style: TextStyle(color: _isSocketLive ? Colors.green : Colors.orange, fontSize: 12),
+            ),
+          ),
+        ),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
@@ -274,5 +303,12 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
                       ),
                     ),
     );
+  }
+
+  @override
+  void dispose() {
+    _socketStateSub?.cancel();
+    ShopSocketService().offAllListeners();
+    super.dispose();
   }
 }

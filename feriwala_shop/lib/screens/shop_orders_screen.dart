@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/shop_socket_service.dart';
 
 class ShopOrdersScreen extends StatefulWidget {
   const ShopOrdersScreen({super.key});
@@ -23,6 +24,8 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
   bool _highValueOnly = false;
   Timer? _pollTimer;
   DateTime? _lastSyncAt;
+  bool _isSocketLive = false;
+  StreamSubscription<bool>? _socketStateSub;
 
   @override
   void initState() {
@@ -36,7 +39,21 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
       }
     });
     _loadOrders();
+    _setupRealtime();
     _pollTimer = Timer.periodic(const Duration(seconds: 25), (_) => _loadOrders(silent: true));
+  }
+
+  Future<void> _setupRealtime() async {
+    final shopId = context.read<ShopAuthProvider>().shopId;
+    if (shopId == null) return;
+    final socket = ShopSocketService();
+    await socket.connect(shopId: shopId);
+    socket.onNewOrder((_) => _loadOrders(silent: true));
+    socket.onOrderUpdated((_) => _loadOrders(silent: true));
+    _socketStateSub = socket.connectionStateStream.listen((connected) {
+      if (!mounted) return;
+      setState(() => _isSocketLive = connected);
+    });
   }
 
   Future<void> _loadOrders({bool silent = false}) async {
@@ -164,6 +181,8 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _socketStateSub?.cancel();
+    ShopSocketService().offAllListeners();
     _searchCtrl.dispose();
     _tabController.dispose();
     super.dispose();
@@ -250,8 +269,10 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
                   child: Text(
                     _lastSyncAt == null
                         ? 'Live sync: starting...'
-                        : 'Live sync: active • last ${_lastSyncAt!.hour.toString().padLeft(2, '0')}:${_lastSyncAt!.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(fontSize: 12, color: Colors.green),
+                        : _isSocketLive
+                            ? 'Live: socket connected • last ${_lastSyncAt!.hour.toString().padLeft(2, '0')}:${_lastSyncAt!.minute.toString().padLeft(2, '0')}'
+                            : 'Live: polling fallback • last ${_lastSyncAt!.hour.toString().padLeft(2, '0')}:${_lastSyncAt!.minute.toString().padLeft(2, '0')}',
+                    style: TextStyle(fontSize: 12, color: _isSocketLive ? Colors.green : Colors.orange),
                   ),
                 ),
               ],
