@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/shop_auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/shop_socket_service.dart';
@@ -157,20 +156,6 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
     _loadTasks();
   }
 
-  Future<void> _openClusterMap() async {
-    final mappable = _tasks.where((t) => t['pickupLat'] != null && t['pickupLng'] != null).toList();
-    if (mappable.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No location-enabled tasks available')));
-      return;
-    }
-    final first = mappable.first;
-    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${first['pickupLat']},${first['pickupLng']}');
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to open map preview')));
-    }
-  }
-
   String _agentLabel(dynamic agentId) {
     final id = agentId?.toString();
     if (id == null || id.isEmpty) return 'Unassigned';
@@ -236,11 +221,6 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
             onPressed: _batchReassignDelayed,
             icon: const Icon(Icons.auto_fix_high),
             tooltip: 'Batch reassign delayed tasks',
-          ),
-          IconButton(
-            onPressed: _openClusterMap,
-            icon: const Icon(Icons.map),
-            tooltip: 'Map preview',
           ),
         ],
         bottom: PreferredSize(
