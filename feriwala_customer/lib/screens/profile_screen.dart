@@ -289,6 +289,15 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 )),
             const SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: const ListTile(
+                leading: Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFF47721)),
+                title: Text('Rewards Wallet'),
+                subtitle: Text('Credits: ₹0 • Tier: Starter • Cashback coming soon'),
+              ),
+            ),
+            const SizedBox(height: 8),
             _ProfileTile(icon: Icons.receipt_long, title: 'My Orders', onTap: () => Navigator.pushNamed(context, '/orders')),
             _ProfileTile(icon: Icons.notifications_outlined, title: 'Notification Preferences', onTap: () => _showNotificationPrefs(context)),
             _ProfileTile(icon: Icons.card_giftcard, title: 'Refer & Earn', onTap: () => _showReferralSheet(context, user)),

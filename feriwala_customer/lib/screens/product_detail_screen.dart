@@ -261,6 +261,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               const SizedBox(height: 8),
                               Text(_product!['description'], style: const TextStyle(color: Colors.grey, height: 1.5)),
                             ],
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+                              child: const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Policy highlights', style: TextStyle(fontWeight: FontWeight.w600)),
+                                  SizedBox(height: 4),
+                                  Text('• Free cancellation before pickup'),
+                                  Text('• 7-day return window on eligible items'),
+                                  Text('• Refund processed after quality check'),
+                                ],
+                              ),
+                            ),
                             if ((_product!['highlights'] as List?)?.isNotEmpty == true) ...[
                               const SizedBox(height: 12),
                               const Text('Highlights', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),

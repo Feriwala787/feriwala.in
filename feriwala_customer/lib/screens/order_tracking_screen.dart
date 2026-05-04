@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/error_reporter.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final int orderId;
@@ -56,6 +57,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         _loading = false;
       });
     } catch (e) {
+      ErrorReporter.message('order_tracking_load_failed');
       setState(() => _loading = false);
     }
   }
