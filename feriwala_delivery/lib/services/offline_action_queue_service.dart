@@ -50,7 +50,9 @@ class OfflineActionQueueService {
   static final OfflineActionQueueService instance = OfflineActionQueueService();
 
   static const _storageKey = 'delivery_offline_action_queue';
+  static const _deadLetterKey = 'delivery_offline_action_dead_letter_queue';
   static const _maxQueueSize = 200;
+  static const _maxRetryCount = 5;
   final DeliveryApiService _api;
   bool _isProcessing = false;
 
@@ -65,6 +67,14 @@ class OfflineActionQueueService {
   Future<void> _saveQueue(List<OfflineAction> actions) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_storageKey, jsonEncode(actions.map((e) => e.toJson()).toList()));
+  }
+
+  Future<void> _appendDeadLetter(OfflineAction action) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_deadLetterKey);
+    final existing = raw == null || raw.isEmpty ? <dynamic>[] : jsonDecode(raw) as List<dynamic>;
+    existing.add(action.toJson());
+    await prefs.setString(_deadLetterKey, jsonEncode(existing));
   }
 
   Future<void> enqueuePut({
@@ -111,6 +121,10 @@ class OfflineActionQueueService {
           await _api.put(action.endpoint, body: action.body, extraHeaders: {'X-Idempotency-Key': action.id});
         } catch (_) {
           final nextRetry = action.retryCount + 1;
+          if (nextRetry > _maxRetryCount) {
+            await _appendDeadLetter(action.copyWith(retryCount: nextRetry));
+            continue;
+          }
           final backoffSeconds = min(300, pow(2, min(nextRetry, 8)).toInt());
           updated.add(action.copyWith(
             retryCount: nextRetry,

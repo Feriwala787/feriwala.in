@@ -11,7 +11,14 @@ class SecurityPostureService {
   bool get allowSensitiveNetworkCalls {
     // In debug/profile we keep this permissive for developer workflow.
     if (!kReleaseMode) return true;
-    // Placeholder for stronger runtime checks.
+    const blockOnEmulator = bool.fromEnvironment('SECURITY_BLOCK_EMULATOR', defaultValue: false);
+    const pinningHealthy = bool.fromEnvironment('TLS_PINNING_HEALTHY', defaultValue: true);
+    if (!pinningHealthy) return false;
+    if (blockOnEmulator) {
+      // Emulator detection can be implemented per-platform in native layers and
+      // passed via dart-define. For now this flag allows policy enforcement.
+      return false;
+    }
     return true;
   }
 }

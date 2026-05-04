@@ -65,4 +65,28 @@ void main() {
     }
     expect(await queue.pendingCount(), 200);
   });
+
+  test('moves action to dead letter after max retries', () async {
+    final api = FakeApiService(failCount: 10);
+    final queue = OfflineActionQueueService(api: api);
+    await queue.enqueuePut(endpoint: '/delivery/tasks/99/accept', body: const {}, id: 'task-99');
+
+    for (var i = 0; i < 6; i++) {
+      await queue.processQueue();
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('delivery_offline_action_queue');
+      if (raw != null && raw.isNotEmpty) {
+        final items = jsonDecode(raw) as List<dynamic>;
+        for (final item in items) {
+          item['nextAttemptAt'] = DateTime.now().subtract(const Duration(seconds: 1)).toIso8601String();
+        }
+        await prefs.setString('delivery_offline_action_queue', jsonEncode(items));
+      }
+    }
+
+    expect(await queue.pendingCount(), 0);
+    final prefs = await SharedPreferences.getInstance();
+    final dead = jsonDecode(prefs.getString('delivery_offline_action_dead_letter_queue')!) as List<dynamic>;
+    expect(dead.isNotEmpty, true);
+  });
 }

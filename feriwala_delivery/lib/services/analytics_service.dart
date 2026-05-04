@@ -8,6 +8,7 @@ class AnalyticsService {
   static final AnalyticsService instance = AnalyticsService._();
 
   static const _eventsKey = 'delivery_analytics_events';
+  static const _exportBatchSize = 50;
   final DeliveryApiService _api = DeliveryApiService();
 
   Future<void> track(String name, {Map<String, dynamic>? props}) async {
@@ -32,8 +33,14 @@ class AnalyticsService {
 
     final events = jsonDecode(raw) as List<dynamic>;
     if (events.isEmpty) return;
+    final batch = events.take(_exportBatchSize).toList();
+    await _api.post('/delivery/telemetry/events', body: {'events': batch, 'schemaVersion': 1});
 
-    await _api.post('/delivery/telemetry/events', body: {'events': events});
-    await prefs.remove(_eventsKey);
+    if (events.length <= _exportBatchSize) {
+      await prefs.remove(_eventsKey);
+    } else {
+      final remaining = events.skip(_exportBatchSize).toList();
+      await prefs.setString(_eventsKey, jsonEncode(remaining));
+    }
   }
 }
