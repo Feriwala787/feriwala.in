@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'services/error_reporter.dart';
+import 'services/required_permissions_service.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'providers/shop_auth_provider.dart';
@@ -45,6 +46,8 @@ void main() async {
   };
 
   try {
+    await RequiredPermissionsService().requestStartupPermissions();
+
     await ShopApiService().init();
   } catch (error, stackTrace) {
     ErrorReporter.report(error, stackTrace, context: 'api-init');
