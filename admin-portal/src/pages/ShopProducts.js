@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -96,6 +96,12 @@ export default function ShopProducts() {
   const [imageQualityIssues, setImageQualityIssues] = useState([]);
   const [variantStock, setVariantStock] = useState({});
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiImages, setAiImages] = useState([]);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiPreviews, setAiPreviews] = useState([]);
+  const aiFileRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -386,6 +392,55 @@ export default function ShopProducts() {
     }
   };
 
+  const handleAiImageChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    setAiImages(files);
+    setAiPreviews(files.map((f) => URL.createObjectURL(f)));
+  };
+
+  const runAiAnalysis = async () => {
+    if (aiImages.length === 0) { toast.error('Drop at least one product image'); return; }
+    setAiLoading(true);
+    try {
+      const formData = new FormData();
+      aiImages.forEach((f) => formData.append('images', f));
+      if (aiPrompt.trim()) formData.append('prompt', aiPrompt.trim());
+      const res = await api.post('/ai/analyze-product', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const d = res.data.data;
+
+      setForm((prev) => ({
+        ...prev,
+        name: d.name || prev.name,
+        brand: d.brand || prev.brand,
+        description: d.description || prev.description,
+        shortDescription: d.shortDescription || prev.shortDescription,
+        productType: d.productType || prev.productType,
+        gender: d.gender || prev.gender,
+        color: d.color?.length ? d.color : (d.variantColors?.length ? d.variantColors : prev.color),
+        size: d.size?.length ? d.size : prev.size,
+        material: d.material || prev.material,
+        fit: d.fit || prev.fit,
+        pattern: d.pattern || prev.pattern,
+        occasion: d.occasion || prev.occasion,
+        sleeveType: d.sleeveType || prev.sleeveType,
+        neckType: d.neckType || prev.neckType,
+        tags: d.tags?.length ? d.tags : prev.tags,
+        highlights: d.highlights?.length ? d.highlights : prev.highlights,
+        mrp: d.mrp || prev.mrp,
+        sellingPrice: d.sellingPrice || prev.sellingPrice,
+      }));
+
+      // Use the dropped images as product images too
+      setImages(aiImages);
+      toast.success(`AI filled the form! Confidence: ${d.confidence || 'medium'}. Review and adjust before saving.`);
+      setAiOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'AI analysis failed');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const toggleStatus = async (product) => {
     try {
       await api.put(`/products/${product.id}`, { isActive: !product.isActive });
@@ -512,6 +567,84 @@ export default function ShopProducts() {
             </div>
           ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+
+            {/* ── AI Assist Panel ── */}
+            <div className="rounded-xl border-2 border-dashed border-primary-300 bg-primary-50">
+              <button
+                type="button"
+                onClick={() => setAiOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">✨</span>
+                  <span className="font-semibold text-primary-800">AI Product Assist</span>
+                  <span className="text-xs bg-primary-200 text-primary-800 px-2 py-0.5 rounded-full">Gemini Vision</span>
+                </div>
+                <span className="text-primary-600 text-sm">{aiOpen ? '▲ Hide' : '▼ Drop images to auto-fill form'}</span>
+              </button>
+
+              {aiOpen && (
+                <div className="px-4 pb-4 space-y-3">
+                  <p className="text-xs text-primary-700">
+                    Drop product photos (different colours, angles) and optionally describe the product. AI will auto-fill the entire form.
+                  </p>
+
+                  {/* Drop zone */}
+                  <div
+                    className="border-2 border-dashed border-primary-300 rounded-lg p-6 text-center cursor-pointer hover:bg-primary-100 transition"
+                    onClick={() => aiFileRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith('image/'));
+                      setAiImages(files);
+                      setAiPreviews(files.map((f) => URL.createObjectURL(f)));
+                    }}
+                  >
+                    <input ref={aiFileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAiImageChange} />
+                    {aiPreviews.length === 0 ? (
+                      <div>
+                        <p className="text-3xl mb-2">📸</p>
+                        <p className="text-sm text-primary-700 font-medium">Drag & drop product images here</p>
+                        <p className="text-xs text-gray-500 mt-1">or click to browse — supports multiple images (different colours/angles)</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {aiPreviews.map((src, i) => (
+                          <img key={i} src={src} alt={`ai-${i}`} className="w-20 h-20 object-cover rounded-lg border-2 border-primary-300" />
+                        ))}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setAiImages([]); setAiPreviews([]); }} className="w-20 h-20 flex items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-xs">Clear</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Optional prompt */}
+                  <div>
+                    <label className="block text-xs font-medium text-primary-800 mb-1">Optional: describe the product or add details AI might miss</label>
+                    <textarea
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      rows={2}
+                      placeholder="e.g. This is a men's cotton t-shirt available in S/M/L/XL, MRP ₹599, selling at ₹399. Colors: black, white, navy."
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={runAiAnalysis}
+                    disabled={aiLoading || aiImages.length === 0}
+                    className="w-full py-2.5 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {aiLoading ? (
+                      <><span className="animate-spin">⏳</span> Analysing with Gemini...</>
+                    ) : (
+                      <><span>✨</span> Analyse &amp; Fill Form</>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-gray-800">Listing completeness</p>

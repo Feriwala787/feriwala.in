@@ -21,6 +21,7 @@ const deliveryRoutes = require('./routes/delivery');
 const promoRoutes = require('./routes/promos');
 const adminRoutes = require('./routes/admin');
 const customerRoutes = require('./routes/customers');
+const aiRoutes = require('./routes/ai');
 
 // ─── DB status (declared before any route handler references it) ──────────────
 const dbStatus = {
@@ -136,6 +137,7 @@ app.use('/api/delivery', deliveryRoutes);
 app.use('/api/promos', promoRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/ai', aiRoutes);
 
 // ─── Health checks ────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
