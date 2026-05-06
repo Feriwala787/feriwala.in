@@ -60,6 +60,7 @@ jobs:
             cd ..
             PM2_BIN=$(command -v pm2 || echo /opt/bitnami/node/lib/node_modules/pm2/bin/pm2)
             "$PM2_BIN" delete feriwala-api 2>/dev/null || true
+            "$PM2_BIN" delete feriwala-backend 2>/dev/null || true
             "$PM2_BIN" start ecosystem.config.js
             "$PM2_BIN" save
             echo "=== Deployment complete ==="
