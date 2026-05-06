@@ -46,40 +46,14 @@ jobs:
       - name: Resolve server SSH access
         env:
           LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set -euo pipefail
           if [ -n "$LIGHTSAIL_SSH_KEY" ]; then
-            printf '%s' "$LIGHTSAIL_SSH_KEY" | tr -d '\r' > lightsail.pem
+            printf '%s' "$LIGHTSAIL_SSH_KEY" > lightsail.pem
             chmod 600 lightsail.pem
-            {
-              echo "SSH_USER=$SSH_USER"
-              echo "SSH_HOST=$SSH_HOST"
-              echo "SSH_OPTS=-i lightsail.pem -o StrictHostKeyChecking=no"
-            } >> "$GITHUB_ENV"
-          elif aws sts get-caller-identity >/dev/null 2>&1; then
-            aws lightsail get-instance-access-details \
-              --region "$AWS_REGION" \
-              --instance-name "$LIGHTSAIL_INSTANCE_NAME" \
-              > access.json
-            python - <<'PY' >> "$GITHUB_ENV"
-            import json
-            from pathlib import Path
-            payload = json.loads(Path('access.json').read_text())
-            details = payload['accessDetails']
-            Path('lightsail.pem').write_text(details['privateKey'])
-            cert = details.get('certKey', '')
-            if cert:
-                Path('lightsail-cert.pub').write_text(cert + '\n')
-            print(f"SSH_USER={details.get('username', 'bitnami')}")
-            print(f"SSH_HOST={details.get('ipAddress', '65.2.9.216')}")
-            print("SSH_OPTS=-i lightsail.pem -o CertificateFile=lightsail-cert.pub -o StrictHostKeyChecking=no")
-            PY
-            chmod 600 lightsail.pem
+            echo "SSH_OPTS=-i lightsail.pem -o StrictHostKeyChecking=no" >> "$GITHUB_ENV"
           else
-            echo "::error::Missing AWS credentials and LIGHTSAIL_SSH_KEY. Configure AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY or LIGHTSAIL_SSH_KEY, then rerun this workflow."
+            echo "::error::LIGHTSAIL_SSH_KEY secret is not set."
             exit 1
           fi
 
