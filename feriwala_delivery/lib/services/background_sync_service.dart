@@ -1,43 +1,36 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:workmanager/workmanager.dart';
-
 import 'api_service.dart';
 import 'offline_action_queue_service.dart';
 import 'error_reporter.dart';
 
+// Simplified background sync using in-app periodic timer
+// (workmanager removed due to Flutter embedding v2 incompatibility)
 class BackgroundSyncService {
   BackgroundSyncService._();
   static final BackgroundSyncService instance = BackgroundSyncService._();
 
-  static const String replayQueueTask = 'delivery_replay_queue_task';
+  Timer? _timer;
 
   Future<void> init() async {
-    await Workmanager().initialize(callbackDispatcher, isInDebugMode: !kReleaseMode);
+    // No-op: timer started via registerPeriodicTasks
   }
 
   Future<void> registerPeriodicTasks() async {
-    await Workmanager().registerPeriodicTask(
-      'delivery-periodic-replay',
-      replayQueueTask,
-      frequency: const Duration(minutes: 15),
-      constraints: Constraints(networkType: NetworkType.connected),
-      existingWorkPolicy: ExistingWorkPolicy.keep,
-    );
-  }
-
-  @pragma('vm:entry-point')
-  static void callbackDispatcher() {
-    Workmanager().executeTask((task, inputData) async {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(minutes: 15), (_) async {
       try {
         await DeliveryApiService().init();
-        if (task == replayQueueTask) {
-          await OfflineActionQueueService.instance.processQueue();
-        }
-        return Future.value(true);
+        await OfflineActionQueueService.instance.processQueue();
       } catch (error, stack) {
         ErrorReporter.report(error, stack, context: 'background-sync');
-        return Future.value(false);
       }
     });
+    if (kDebugMode) debugPrint('[BackgroundSyncService] periodic sync started');
+  }
+
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
   }
 }
