@@ -176,3 +176,4 @@ router.post('/create-product', authenticate, authorize('shop_admin', 'admin'), u
 });
 
 module.exports = router;
+// gemini-3.1-flash-lite-preview Wed May  6 14:52:46 UTC 2026
