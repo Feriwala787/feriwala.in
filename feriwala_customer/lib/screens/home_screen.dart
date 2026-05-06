@@ -70,6 +70,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _initializeHome();
   }
 
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _initializeHome() async {
     await _loadHomeFeed();
     await _loadRecentProducts();
@@ -430,13 +437,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final recentIds = _recentProducts.map((e) => e['id']).whereType<int>().toSet();
     if (recentIds.isEmpty) return [];
     return _browseProductsAsMap().where((p) => !recentIds.contains(p['id'])).take(10).toList();
-  }
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
@@ -948,13 +948,6 @@ class _SectionRow extends StatelessWidget {
   const _SectionRow({required this.title, required this.products});
 
   @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     if (products.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -983,13 +976,6 @@ class _CategoryTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   const _CategoryTile({required this.category, required this.selected, required this.onTap});
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1025,13 +1011,6 @@ class _CategoryTile extends StatelessWidget {
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductCard({required this.product});
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1091,13 +1070,6 @@ class _ProductCard extends StatelessWidget {
 class _ProductGridItem extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductGridItem({required this.product});
-
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {

@@ -57,6 +57,7 @@ jobs:
             set -e
             cd /home/bitnami/feriwala/backend
             npm ci --omit=dev || npm install --omit=dev
+            node seed-categories.js 2>/dev/null || true
             cd ..
             PM2_BIN=$(command -v pm2 || echo /opt/bitnami/node/lib/node_modules/pm2/bin/pm2)
             "$PM2_BIN" delete feriwala-api 2>/dev/null || true
