@@ -69,7 +69,12 @@ router.post('/analyze-product', upload.array('images', 15), async (req, res) => 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return res.status(422).json({ success: false, message: 'AI could not extract product details from images' });
 
-    res.json({ success: true, data: JSON.parse(jsonMatch[0]) });
+    const data = JSON.parse(jsonMatch[0]);
+    // Normalize: admin portal expects `color` and `size` arrays
+    data.color = data.colors || data.color || [];
+    data.size = data.sizes || data.size || [];
+    data.variantColors = data.color;
+    res.json({ success: true, data });
   } catch (err) {
     console.error('AI analyze-product error:', err.message);
     res.status(500).json({ success: false, message: 'AI analysis failed: ' + err.message });

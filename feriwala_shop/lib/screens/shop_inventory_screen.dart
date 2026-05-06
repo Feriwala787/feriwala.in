@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
 import '../services/api_service.dart';
-import 'ai_product_upload_screen.dart';
 
 class ShopInventoryScreen extends StatefulWidget {
   const ShopInventoryScreen({super.key});
@@ -193,15 +192,6 @@ class _ShopInventoryScreenState extends State<ShopInventoryScreen> {
         actions: [
           IconButton(onPressed: _restockLowStockQueue, icon: const Icon(Icons.playlist_add_check), tooltip: 'One-click restock plan'),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final added = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const AiProductUploadScreen()));
-          if (added == true) _loadProducts();
-        },
-        backgroundColor: const Color(0xFF1A1A2E),
-        icon: const Icon(Icons.auto_awesome, color: Colors.white),
-        label: const Text('AI Add Product', style: TextStyle(color: Colors.white)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

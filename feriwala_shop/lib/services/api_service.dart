@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ShopApiService {
@@ -123,26 +121,6 @@ class ShopApiService {
   Future<Map<String, dynamic>> delete(String endpoint) async {
     return _requestWithAutoRefresh(
         () => http.delete(Uri.parse('$baseUrl$endpoint'), headers: _headers));
-  }
-
-  Future<Map<String, dynamic>> uploadFiles(
-    String endpoint, {
-    required List<File> files,
-    Map<String, String> fields = const {},
-  }) async {
-    final uri = Uri.parse('$baseUrl$endpoint');
-    final request = http.MultipartRequest('POST', uri);
-    if (_token != null) request.headers['Authorization'] = 'Bearer $_token';
-    fields.forEach((k, v) => request.fields[k] = v);
-    for (final file in files) {
-      final bytes = await file.readAsBytes();
-      final ext = file.path.split('.').last.toLowerCase();
-      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
-      request.files.add(http.MultipartFile.fromBytes('images', bytes, filename: file.path.split('/').last, contentType: MediaType('image', ext == 'png' ? 'png' : 'jpeg')));
-    }
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
-    return _handleResponse(response);
   }
 
   Map<String, dynamic> _handleResponse(http.Response response) {
