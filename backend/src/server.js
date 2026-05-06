@@ -139,6 +139,33 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/ai', aiRoutes);
 
+// ─── Legal pages (required for Play Store / App Store) ────────────────────────
+app.get('/privacy', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Privacy Policy - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}</style></head><body>
+<h1>Privacy Policy</h1><p><em>Last updated: May 2025</em></p>
+<h2>1. Information We Collect</h2><p>We collect: name, email, phone number, delivery addresses, order history, and device location (foreground only, to find nearby stores).</p>
+<h2>2. How We Use Your Information</h2><p>To process orders, send delivery updates, show nearby stores, and improve our service. We do <strong>not</strong> sell your data.</p>
+<h2>3. Location Data</h2><p>Location is accessed only while the app is open (foreground). We do not track location in the background.</p>
+<h2>4. Data Storage &amp; Security</h2><p>Data is stored on AWS servers in Mumbai (ap-south-1). All transmission uses HTTPS. Passwords are hashed.</p>
+<h2>5. Data Sharing</h2><p>We share your name and address with delivery partners only to fulfil your order. No data is shared with advertisers.</p>
+<h2>6. Your Rights</h2><p>You may request data access, correction, or deletion by emailing <a href="mailto:privacy@feriwala.in">privacy@feriwala.in</a>.</p>
+<h2>7. Children</h2><p>Feriwala is not directed at children under 13.</p>
+<h2>8. Contact</h2><p>Email: <a href="mailto:privacy@feriwala.in">privacy@feriwala.in</a></p>
+</body></html>`);
+});
+
+app.get('/terms', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Terms &amp; Conditions - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}</style></head><body>
+<h1>Terms &amp; Conditions</h1><p><em>Last updated: May 2025</em></p>
+<h2>1. Acceptance</h2><p>By using Feriwala you agree to these terms.</p>
+<h2>2. Service</h2><p>Feriwala connects customers with local clothing and footwear stores for quick delivery.</p>
+<h2>3. Orders &amp; Payments</h2><p>Orders subject to availability. Currently Cash on Delivery only. We may cancel orders due to stock issues.</p>
+<h2>4. Returns</h2><p>Returns accepted within 24 hours for damaged or wrong items. Refunds processed within 5-7 business days.</p>
+<h2>5. Governing Law</h2><p>Governed by the laws of India.</p>
+<h2>6. Contact</h2><p>support@feriwala.in</p>
+</body></html>`);
+});
+
 // ─── Health checks ────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

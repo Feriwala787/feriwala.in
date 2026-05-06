@@ -114,6 +114,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       : const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text.rich(
+                  TextSpan(
+                    text: 'By creating an account you agree to our ',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    children: [
+                      WidgetSpan(child: GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/terms'),
+                        child: const Text('Terms & Conditions', style: TextStyle(fontSize: 12, color: Color(0xFFF47721), decoration: TextDecoration.underline)),
+                      )),
+                      const TextSpan(text: ' and '),
+                      WidgetSpan(child: GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/privacy'),
+                        child: const Text('Privacy Policy', style: TextStyle(fontSize: 12, color: Color(0xFFF47721), decoration: TextDecoration.underline)),
+                      )),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ],
           ),
         ),

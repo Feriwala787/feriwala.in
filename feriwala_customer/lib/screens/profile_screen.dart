@@ -302,7 +302,15 @@ class ProfileScreen extends StatelessWidget {
             _ProfileTile(icon: Icons.notifications_outlined, title: 'Notification Preferences', onTap: () => _showNotificationPrefs(context)),
             _ProfileTile(icon: Icons.card_giftcard, title: 'Refer & Earn', onTap: () => _showReferralSheet(context, user)),
             _ProfileTile(icon: Icons.help_outline, title: 'Help & Support', onTap: () {}),
-            _ProfileTile(icon: Icons.info_outline, title: 'About', onTap: () {}),
+            _ProfileTile(icon: Icons.privacy_tip_outlined, title: 'Privacy Policy', onTap: () => Navigator.pushNamed(context, '/privacy')),
+            _ProfileTile(icon: Icons.description_outlined, title: 'Terms & Conditions', onTap: () => Navigator.pushNamed(context, '/terms')),
+            _ProfileTile(icon: Icons.info_outline, title: 'About Feriwala v1.1.0', onTap: () => showAboutDialog(
+              context: context,
+              applicationName: 'Feriwala',
+              applicationVersion: '1.1.0',
+              applicationLegalese: '© 2025 Feriwala. All rights reserved.',
+              children: [const Text('Quick commerce for clothes & footwear.')],
+            )),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

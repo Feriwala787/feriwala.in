@@ -17,6 +17,8 @@ import 'screens/checkout_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/order_tracking_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/privacy_policy_screen.dart';
+import 'screens/terms_screen.dart';
 
 int? _parseRouteInt(Object? value) {
   if (value is int) return value;
@@ -102,6 +104,8 @@ class FeriwalaCustomerApp extends StatelessWidget {
           '/checkout': (context) => const CheckoutScreen(),
           '/orders': (context) => const OrdersScreen(),
           '/profile': (context) => const ProfileScreen(),
+          '/privacy': (context) => const PrivacyPolicyScreen(),
+          '/terms': (context) => const TermsScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/product') {
