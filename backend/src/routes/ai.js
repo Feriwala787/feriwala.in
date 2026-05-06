@@ -14,39 +14,15 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const genAI = new GoogleGenerativeAI(process.env.Google_gemini_api);
 const MODEL = 'gemini-3.1-flash-lite-preview';
 
-// Normalize image: resize to max 1200px, crop to 4:5 ratio (0.8), convert to JPEG
+// Normalize image: smart-crop to 4:5 ratio, resize to 960x1200, convert to JPEG
 async function normalizeImage(buffer) {
-  const img = sharp(buffer);
-  const meta = await img.metadata();
-  const w = meta.width;
-  const h = meta.height;
-
-  // Target ratio 4:5 (portrait) — safe for all platforms
-  const TARGET_RATIO = 4 / 5;
-  const MAX_SIZE = 1200;
-
-  let cropW = w;
-  let cropH = h;
-  const ratio = w / h;
-
-  if (ratio > TARGET_RATIO) {
-    // Too wide — crop width
-    cropW = Math.round(h * TARGET_RATIO);
-  } else if (ratio < TARGET_RATIO) {
-    // Too tall — crop height
-    cropH = Math.round(w / TARGET_RATIO);
-  }
-
-  // Center crop then resize
-  const left = Math.round((w - cropW) / 2);
-  const top = Math.round((h - cropH) / 2);
-
-  const finalW = Math.min(cropW, MAX_SIZE);
-  const finalH = Math.min(cropH, Math.round(MAX_SIZE / TARGET_RATIO));
-
-  return img
-    .extract({ left, top, width: cropW, height: cropH })
-    .resize(finalW, finalH, { fit: 'fill' })
+  // Use sharp's attention-based smart crop — finds the most important region
+  // (face, product, high-contrast area) instead of blindly center-cropping
+  return sharp(buffer)
+    .resize(960, 1200, {
+      fit: 'cover',
+      position: sharp.strategy.attention, // smart crop: focuses on salient region
+    })
     .jpeg({ quality: 88, progressive: true })
     .toBuffer();
 }
