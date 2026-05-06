@@ -27,8 +27,24 @@ async function normalizeImage(buffer) {
     .toBuffer();
 }
 
-const AI_PROMPT = (userPrompt) => `You are a product listing assistant for Feriwala, a quick-commerce clothing platform in India.
+const AI_PROMPT = (userPrompt, categoryType = 'clothing') => {
+  const isFootwear = categoryType === 'footwear';
+  const productTypes = isFootwear
+    ? 'Sneakers, Running Shoes, Casual Shoes, Formal Shoes, Loafers, Sandals, Slippers, Boots, Ankle Boots, Heels, Wedges, Flats, Sports Shoes, Flip Flops'
+    : 'T-Shirt, Shirt, Polo Shirt, Kurta, Kurti, Jeans, Trousers, Chinos, Shorts, Track Pants, Joggers, Dress, Skirt, Leggings, Saree, Salwar Suit, Jacket, Hoodie, Sweatshirt, Blazer, Coat, Innerwear, Sleepwear, Swimwear';
+  const extraFields = isFootwear
+    ? `  "sole": "Rubber|EVA|TPR|Leather|Synthetic",
+  "closure": "Lace-up|Slip-on|Velcro|Buckle|Zipper",
+  "occasion": "one of: Casual, Formal, Sports, Party, Beach, Trekking, Wedding",`
+    : `  "fit": "one of: Regular Fit, Slim Fit, Relaxed Fit, Oversized, Skinny Fit, Straight Fit, Tapered Fit",
+  "pattern": "one of: Solid, Striped, Checked, Printed, Floral, Geometric, Abstract, Camouflage, Tie-Dye, Embroidered",
+  "occasion": "one of: Casual, Formal, Party, Sports, Festive, Beach, Lounge, Workwear, Wedding",
+  "sleeveType": "one of: Half Sleeve, Full Sleeve, Sleeveless, 3/4 Sleeve, Cap Sleeve, Raglan or empty",
+  "neckType": "one of: Round Neck, V Neck, Collar, Polo Collar, Mandarin, Hooded, Boat Neck, Square Neck or empty",`;
+
+  return `You are a product listing assistant for Feriwala, a quick-commerce platform in India.
 Analyze ALL provided product images carefully.${userPrompt ? ` Seller note: "${userPrompt}".` : ''}
+This is a ${categoryType.toUpperCase()} product.
 
 Look at every image — different colours, angles, labels — and extract all details.
 
@@ -37,23 +53,20 @@ Return ONLY a valid JSON object, no markdown, no explanation:
   "name": "concise product name",
   "brand": "brand from label/tag or empty string",
   "description": "2-3 sentence product description",
-  "shortDescription": "Material: X | Fit: Y | Use: Z",
-  "productType": "one of: T-Shirt, Shirt, Polo Shirt, Kurta, Kurti, Jeans, Trousers, Chinos, Shorts, Track Pants, Joggers, Dress, Skirt, Leggings, Saree, Salwar Suit, Jacket, Hoodie, Sweatshirt, Blazer, Coat, Innerwear, Sleepwear, Swimwear",
+  "shortDescription": "Material: X | ${isFootwear ? 'Sole' : 'Fit'}: Y | Use: Z",
+  "productType": "one of: ${productTypes}",
   "gender": "one of: men, women, unisex, kids",
   "colors": ["list all visible colours from all images"],
-  "sizes": ["S", "M", "L", "XL"],
-  "material": "fabric material",
-  "fit": "one of: Regular Fit, Slim Fit, Relaxed Fit, Oversized, Skinny Fit, Straight Fit, Tapered Fit",
-  "pattern": "one of: Solid, Striped, Checked, Printed, Floral, Geometric, Abstract, Camouflage, Tie-Dye, Embroidered",
-  "occasion": "one of: Casual, Formal, Party, Sports, Festive, Beach, Lounge, Workwear, Wedding",
-  "sleeveType": "one of: Half Sleeve, Full Sleeve, Sleeveless, 3/4 Sleeve, Cap Sleeve, Raglan or empty",
-  "neckType": "one of: Round Neck, V Neck, Collar, Polo Collar, Mandarin, Hooded, Boat Neck, Square Neck or empty",
+  "sizes": ${isFootwear ? '["6", "7", "8", "9", "10"]' : '["S", "M", "L", "XL"]'},
+  "material": "upper material e.g. Canvas, Leather, Mesh, Synthetic",
+${extraFields}
   "tags": ["tag1", "tag2", "tag3"],
   "highlights": ["key feature 1", "key feature 2"],
   "mrp": "suggested MRP in INR as number only",
   "sellingPrice": "suggested selling price in INR as number only",
   "confidence": "high or medium or low"
 }`;
+};
 
 // Save normalized image buffers to disk and return public URLs
 async function saveImages(files) {
@@ -79,7 +92,7 @@ router.post('/analyze-product', upload.array('images', 15), async (req, res) => 
     const normalizedBuffers = await Promise.all(files.map(f => normalizeImage(f.buffer)));
     const imageParts = normalizedBuffers.map((buf) => ({ inlineData: { data: buf.toString('base64'), mimeType: 'image/jpeg' } }));
 
-    const result = await model.generateContent([AI_PROMPT(req.body.prompt || ''), ...imageParts]);
+    const result = await model.generateContent([AI_PROMPT(req.body.prompt || '', req.body.categoryType || 'clothing'), ...imageParts]);
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return res.status(422).json({ success: false, message: 'AI could not extract product details from images' });
@@ -115,7 +128,7 @@ router.post('/create-product', authenticate, authorize('shop_admin', 'admin'), u
     const model = genAI.getGenerativeModel({ model: MODEL });
     const normalizedBuffers2 = await Promise.all(files.map(f => normalizeImage(f.buffer)));
     const imageParts = normalizedBuffers2.map((buf) => ({ inlineData: { data: buf.toString('base64'), mimeType: 'image/jpeg' } }));
-    const result = await model.generateContent([AI_PROMPT(req.body.prompt || ''), ...imageParts]);
+    const result = await model.generateContent([AI_PROMPT(req.body.prompt || '', req.body.categoryType || 'clothing'), ...imageParts]);
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return res.status(422).json({ success: false, message: 'AI could not extract product details' });

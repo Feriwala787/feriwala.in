@@ -38,16 +38,24 @@ const initialForm = {
   isFeatured: false,
   specificationsText: '',
   videoUrl: '',
+  sole: '',
+  closure: '',
 };
 
 const PRODUCT_OPTIONS = {
   sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '28', '30', '32', '34', '36', '38', '40', '42', 'Free Size'],
+  shoeSizes: ['3', '4', '5', '6', '7', '8', '9', '10', '11', '12', 'Free Size'],
   colors: ['Black', 'White', 'Navy', 'Blue', 'Sky Blue', 'Grey', 'Charcoal', 'Red', 'Maroon', 'Burgundy', 'Pink', 'Peach', 'Orange', 'Yellow', 'Green', 'Olive', 'Mint', 'Brown', 'Beige', 'Cream', 'Purple', 'Lavender', 'Multi-color'],
   materials: ['Cotton', '100% Cotton', 'Denim', 'Linen', 'Polyester', 'Nylon', 'Wool', 'Rayon', 'Viscose', 'Silk', 'Satin', 'Velvet', 'Spandex', 'Fleece', 'Leather', 'Synthetic'],
+  footwearMaterials: ['Canvas', 'Leather', 'Synthetic Leather', 'Mesh', 'Suede', 'Rubber', 'Textile', 'Knit'],
   productTypes: ['T-Shirt', 'Shirt', 'Polo Shirt', 'Kurta', 'Kurti', 'Jeans', 'Trousers', 'Chinos', 'Shorts', 'Track Pants', 'Joggers', 'Dress', 'Skirt', 'Leggings', 'Saree', 'Salwar Suit', 'Jacket', 'Hoodie', 'Sweatshirt', 'Blazer', 'Coat', 'Innerwear', 'Sleepwear', 'Swimwear'],
+  footwearTypes: ['Sneakers', 'Running Shoes', 'Casual Shoes', 'Formal Shoes', 'Loafers', 'Sandals', 'Slippers', 'Boots', 'Ankle Boots', 'Heels', 'Wedges', 'Flats', 'Sports Shoes', 'Flip Flops'],
   fits: ['Regular Fit', 'Slim Fit', 'Relaxed Fit', 'Oversized', 'Skinny Fit', 'Straight Fit', 'Tapered Fit'],
   patterns: ['Solid', 'Striped', 'Checked', 'Printed', 'Floral', 'Geometric', 'Abstract', 'Camouflage', 'Tie-Dye', 'Embroidered'],
   occasions: ['Casual', 'Formal', 'Party', 'Sports', 'Festive', 'Beach', 'Lounge', 'Workwear', 'Wedding'],
+  footwearOccasions: ['Casual', 'Formal', 'Sports', 'Party', 'Beach', 'Trekking', 'Wedding'],
+  soles: ['Rubber', 'EVA', 'TPR', 'Leather', 'Synthetic', 'PU'],
+  closures: ['Lace-up', 'Slip-on', 'Velcro', 'Buckle', 'Zipper'],
   sleeveTypes: ['Half Sleeve', 'Full Sleeve', 'Sleeveless', '3/4 Sleeve', 'Cap Sleeve', 'Raglan'],
   neckTypes: ['Round Neck', 'V Neck', 'Collar', 'Polo Collar', 'Mandarin', 'Hooded', 'Boat Neck', 'Square Neck'],
   careInstructions: ['Machine wash', 'Hand wash', 'Dry clean only', 'Do not bleach', 'Cold wash only'],
@@ -101,6 +109,7 @@ export default function ShopProducts() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPreviews, setAiPreviews] = useState([]);
+  const [categoryType, setCategoryType] = useState(''); // '' = not chosen yet, 'clothing' or 'footwear'
   const aiFileRef = useRef(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -156,6 +165,7 @@ export default function ShopProducts() {
     setVideo(null);
     setImageQualityIssues([]);
     setVariantStock({});
+    setCategoryType('');
   };
 
   const startEdit = (product) => {
@@ -405,6 +415,7 @@ export default function ShopProducts() {
       const formData = new FormData();
       aiImages.forEach((f) => formData.append('images', f));
       if (aiPrompt.trim()) formData.append('prompt', aiPrompt.trim());
+      formData.append('categoryType', categoryType || 'clothing');
       const res = await api.post('/ai/analyze-product', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       const d = res.data.data;
 
@@ -428,6 +439,9 @@ export default function ShopProducts() {
         highlights: d.highlights?.length ? d.highlights : prev.highlights,
         mrp: d.mrp || prev.mrp,
         sellingPrice: d.sellingPrice || prev.sellingPrice,
+        // footwear-specific
+        sole: d.sole || prev.sole,
+        closure: d.closure || prev.closure,
       }));
 
       // Use the dropped images as product images too
@@ -458,6 +472,7 @@ export default function ShopProducts() {
     ? Math.max(0, Math.round(((Number(form.mrp) - Number(form.sellingPrice)) / Number(form.mrp || 1)) * 100))
     : 0;
   const variantRows = form.size.flatMap((size) => form.color.map((color) => ({ size, color, key: `${size}__${color}` })));
+  const isFootwear = categoryType === 'footwear';
 
   const renderSingleSelect = (label, name, options) => (
     <div>
@@ -554,11 +569,17 @@ export default function ShopProducts() {
         <div className="xl:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-4 gap-3">
             <h3 className="text-lg font-semibold text-gray-800">{editingId ? 'Edit product' : 'Create product'}</h3>
-            {editingId && isShopOwnerPortal && (
-              <button onClick={resetForm} className="text-sm text-gray-500 hover:text-gray-800">
-                Clear form
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {!editingId && categoryType && (
+                <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                  {categoryType === 'footwear' ? '👟' : '👕'} {categoryType.charAt(0).toUpperCase() + categoryType.slice(1)}
+                  <button type="button" onClick={() => setCategoryType('')} className="ml-1 text-primary-500 hover:text-primary-800">✕</button>
+                </span>
+              )}
+              {editingId && isShopOwnerPortal && (
+                <button onClick={resetForm} className="text-sm text-gray-500 hover:text-gray-800">Clear form</button>
+              )}
+            </div>
           </div>
 
           {!isShopOwnerPortal ? (
@@ -566,6 +587,28 @@ export default function ShopProducts() {
               This view is read-only for admin users. Product creation is allowed only from the shop owner web portal login.
             </div>
           ) : (
+          <>
+          {/* ── Step 0: Category Type Picker ── */}
+          {!editingId && categoryType === '' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 font-medium">What type of product are you listing?</p>
+              <div className="grid grid-cols-2 gap-4">
+                <button type="button" onClick={() => { setCategoryType('clothing'); setForm(prev => ({...prev, categoryId: categories.find(c=>c.slug==='clothing')?.id?.toString() || '1'})); }}
+                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-gray-200 hover:border-primary-500 hover:bg-primary-50 transition">
+                  <span className="text-4xl">👕</span>
+                  <span className="font-semibold text-gray-800">Clothing</span>
+                  <span className="text-xs text-gray-500 text-center">T-shirts, jeans, kurtas, dresses, jackets...</span>
+                </button>
+                <button type="button" onClick={() => { setCategoryType('footwear'); setForm(prev => ({...prev, categoryId: categories.find(c=>c.slug==='footwear')?.id?.toString() || '2'})); }}
+                  className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-gray-200 hover:border-primary-500 hover:bg-primary-50 transition">
+                  <span className="text-4xl">👟</span>
+                  <span className="font-semibold text-gray-800">Footwear</span>
+                  <span className="text-xs text-gray-500 text-center">Sneakers, sandals, heels, boots, slippers...</span>
+                </button>
+              </div>
+            </div>
+          )}
+          {(editingId || categoryType !== '') && (
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* ── AI Assist Panel ── */}
@@ -705,7 +748,7 @@ export default function ShopProducts() {
                 <input name="sku" value={form.sku} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" />
                 <p className="text-xs text-gray-500 mt-1">SEO title suggestion: {seoTitleSuggestion || 'Will appear as you fill fields'}</p>
               </div>
-              {renderSingleSelect('Product type', 'productType', PRODUCT_OPTIONS.productTypes)}
+              {renderSingleSelect('Product type', 'productType', isFootwear ? PRODUCT_OPTIONS.footwearTypes : PRODUCT_OPTIONS.productTypes)}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Stock quantity</label>
                 <input name="quantity" type="number" min="0" value={form.quantity} onChange={handleChange} className="w-full px-3 py-2 border rounded-lg" />
@@ -724,13 +767,15 @@ export default function ShopProducts() {
                   <option value="girls">Girls</option>
                 </select>
               </div>
-              {renderSingleSelect('Material / Fabric', 'material', PRODUCT_OPTIONS.materials)}
-              {renderSingleSelect('Fit', 'fit', PRODUCT_OPTIONS.fits)}
-              {renderSingleSelect('Pattern', 'pattern', PRODUCT_OPTIONS.patterns)}
-              {renderSingleSelect('Occasion', 'occasion', PRODUCT_OPTIONS.occasions)}
+              {renderSingleSelect('Material / Fabric', 'material', isFootwear ? PRODUCT_OPTIONS.footwearMaterials : PRODUCT_OPTIONS.materials)}
+              {!isFootwear && renderSingleSelect('Fit', 'fit', PRODUCT_OPTIONS.fits)}
+              {!isFootwear && renderSingleSelect('Pattern', 'pattern', PRODUCT_OPTIONS.patterns)}
+              {renderSingleSelect('Occasion', 'occasion', isFootwear ? PRODUCT_OPTIONS.footwearOccasions : PRODUCT_OPTIONS.occasions)}
               {renderSingleSelect('Care instructions', 'careInstructions', PRODUCT_OPTIONS.careInstructions)}
-              {renderSingleSelect('Sleeve type (apparel)', 'sleeveType', PRODUCT_OPTIONS.sleeveTypes)}
-              {renderSingleSelect('Neck type (apparel)', 'neckType', PRODUCT_OPTIONS.neckTypes)}
+              {!isFootwear && renderSingleSelect('Sleeve type (apparel)', 'sleeveType', PRODUCT_OPTIONS.sleeveTypes)}
+              {!isFootwear && renderSingleSelect('Neck type (apparel)', 'neckType', PRODUCT_OPTIONS.neckTypes)}
+              {isFootwear && renderSingleSelect('Sole material', 'sole', PRODUCT_OPTIONS.soles)}
+              {isFootwear && renderSingleSelect('Closure type', 'closure', PRODUCT_OPTIONS.closures)}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Country of origin</label>
                 <input name="countryOfOrigin" value={form.countryOfOrigin} onChange={handleChange} placeholder="India" className="w-full px-3 py-2 border rounded-lg" />
@@ -793,7 +838,7 @@ export default function ShopProducts() {
               </p>
             )}
 
-            {renderMultiChoice('Available sizes', 'size', PRODUCT_OPTIONS.sizes)}
+            {renderMultiChoice('Available sizes', 'size', isFootwear ? PRODUCT_OPTIONS.shoeSizes : PRODUCT_OPTIONS.sizes)}
             {renderMultiChoice('Available colors', 'color', PRODUCT_OPTIONS.colors)}
             {renderMultiChoice('Tags', 'tags', PRODUCT_OPTIONS.tags)}
             {renderMultiChoice('Highlights', 'highlights', PRODUCT_OPTIONS.highlights)}
@@ -882,6 +927,8 @@ export default function ShopProducts() {
               {saving ? 'Saving...' : editingId ? 'Update product' : 'Create product'}
             </button>
           </form>
+          )}
+          </>
           )}
         </div>
 
