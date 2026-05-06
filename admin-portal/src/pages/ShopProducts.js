@@ -311,8 +311,8 @@ export default function ShopProducts() {
       return;
     }
     if (imageQualityIssues.length > 0) {
-      toast.error('Some images do not meet recommended quality (min 800x800 and valid ratio).');
-      return;
+      // Images are auto-processed server-side, just warn don't block
+      toast('Some images are low resolution but will be processed automatically.', { icon: '⚠️' });
     }
     if (totalVariantQty <= 0) {
       toast.error('Please fill variant stock matrix (size × color) with at least one quantity.');
@@ -837,7 +837,7 @@ export default function ShopProducts() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Images</label>
               <input type="file" accept="image/*" multiple onChange={handleImageChange} className="w-full text-sm" />
-              <p className="text-xs text-gray-500 mt-1">Recommended: min 800×800 px, aspect ratio between 4:5 and 1.91:1.</p>
+              <p className="text-xs text-gray-500 mt-1">Images are auto-cropped to 4:5 ratio and resized to 960×1200 px on upload. Any size accepted.</p>
               {imageQualityIssues.length > 0 && (
                 <div className="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
                   {imageQualityIssues.map((item) => (

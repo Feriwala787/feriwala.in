@@ -1,8 +1,9 @@
 const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { authenticate, authorize } = require('../middleware/auth');
 const Product = require('../models/pg/Product');
@@ -12,6 +13,43 @@ const Category = require('../models/pg/Category');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const genAI = new GoogleGenerativeAI(process.env.Google_gemini_api);
 const MODEL = 'gemini-3.1-flash-lite-preview';
+
+// Normalize image: resize to max 1200px, crop to 4:5 ratio (0.8), convert to JPEG
+async function normalizeImage(buffer) {
+  const img = sharp(buffer);
+  const meta = await img.metadata();
+  const w = meta.width;
+  const h = meta.height;
+
+  // Target ratio 4:5 (portrait) — safe for all platforms
+  const TARGET_RATIO = 4 / 5;
+  const MAX_SIZE = 1200;
+
+  let cropW = w;
+  let cropH = h;
+  const ratio = w / h;
+
+  if (ratio > TARGET_RATIO) {
+    // Too wide — crop width
+    cropW = Math.round(h * TARGET_RATIO);
+  } else if (ratio < TARGET_RATIO) {
+    // Too tall — crop height
+    cropH = Math.round(w / TARGET_RATIO);
+  }
+
+  // Center crop then resize
+  const left = Math.round((w - cropW) / 2);
+  const top = Math.round((h - cropH) / 2);
+
+  const finalW = Math.min(cropW, MAX_SIZE);
+  const finalH = Math.min(cropH, Math.round(MAX_SIZE / TARGET_RATIO));
+
+  return img
+    .extract({ left, top, width: cropW, height: cropH })
+    .resize(finalW, finalH, { fit: 'fill' })
+    .jpeg({ quality: 88, progressive: true })
+    .toBuffer();
+}
 
 const AI_PROMPT = (userPrompt) => `You are a product listing assistant for Feriwala, a quick-commerce clothing platform in India.
 Analyze ALL provided product images carefully.${userPrompt ? ` Seller note: "${userPrompt}".` : ''}
@@ -41,17 +79,17 @@ Return ONLY a valid JSON object, no markdown, no explanation:
   "confidence": "high or medium or low"
 }`;
 
-// Save uploaded image buffers to disk and return public URLs
-function saveImages(files) {
+// Save normalized image buffers to disk and return public URLs
+async function saveImages(files) {
   const uploadDir = path.join(__dirname, '../../uploads');
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-  return files.map((f) => {
-    const ext = f.mimetype === 'image/png' ? 'png' : 'jpg';
-    const filename = `ai_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    fs.writeFileSync(path.join(uploadDir, filename), f.buffer);
+  return Promise.all(files.map(async (f) => {
+    const normalized = await normalizeImage(f.buffer);
+    const filename = `ai_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+    fs.writeFileSync(path.join(uploadDir, filename), normalized);
     return `${process.env.SERVER_URL || 'http://65.2.9.216'}/uploads/${filename}`;
-  });
+  }));
 }
 
 // POST /api/ai/analyze-product — analyze images, return AI data (no DB write)
@@ -62,7 +100,8 @@ router.post('/analyze-product', upload.array('images', 15), async (req, res) => 
     if (files.length === 0) return res.status(400).json({ success: false, message: 'At least one image is required' });
 
     const model = genAI.getGenerativeModel({ model: MODEL });
-    const imageParts = files.map((f) => ({ inlineData: { data: f.buffer.toString('base64'), mimeType: f.mimetype } }));
+    const normalizedBuffers = await Promise.all(files.map(f => normalizeImage(f.buffer)));
+    const imageParts = normalizedBuffers.map((buf) => ({ inlineData: { data: buf.toString('base64'), mimeType: 'image/jpeg' } }));
 
     const result = await model.generateContent([AI_PROMPT(req.body.prompt || ''), ...imageParts]);
     const text = result.response.text();
@@ -98,7 +137,8 @@ router.post('/create-product', authenticate, authorize('shop_admin', 'admin'), u
 
     // 1. Analyze with Gemini
     const model = genAI.getGenerativeModel({ model: MODEL });
-    const imageParts = files.map((f) => ({ inlineData: { data: f.buffer.toString('base64'), mimeType: f.mimetype } }));
+    const normalizedBuffers2 = await Promise.all(files.map(f => normalizeImage(f.buffer)));
+    const imageParts = normalizedBuffers2.map((buf) => ({ inlineData: { data: buf.toString('base64'), mimeType: 'image/jpeg' } }));
     const result = await model.generateContent([AI_PROMPT(req.body.prompt || ''), ...imageParts]);
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -107,7 +147,7 @@ router.post('/create-product', authenticate, authorize('shop_admin', 'admin'), u
     const ai = JSON.parse(jsonMatch[0]);
 
     // 2. Save images to disk
-    const imageUrls = saveImages(files);
+    const imageUrls = await saveImages(files);
 
     // 3. Category
     let categoryId = parseInt(req.body.categoryId || '0');
