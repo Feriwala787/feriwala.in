@@ -6,1158 +6,521 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../services/api_service.dart';
-import '../services/analytics_service.dart';
-import '../services/error_reporter.dart';
 import '../providers/cart_provider.dart';
+import '../providers/auth_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
   Map<String, dynamic>? _homeFeed;
   List<dynamic> _browseProducts = [];
   List<dynamic> _nearbyWarehouses = [];
   Position? _currentPosition;
   bool _loading = true;
   bool _productLoading = false;
-  bool _warehouseLoading = false;
   final _searchController = TextEditingController();
-  int? _selectedCategoryId;
-  String _selectedCategoryName = 'All';
+  bool _searchActive = false;
+  String? _selectedProductType;
   String _selectedGender = 'men';
-  bool _categoriesExpanded = false;
   Map<String, dynamic>? _selectedWarehouse;
   List<Map<String, dynamic>> _recentProducts = [];
-  List<String> _searchSuggestions = [];
-  String _selectedSort = 'trending';
-  double? _maxPriceFilter;
-  double _minDiscountFilter = 0;
-  bool _etaUnder30Filter = false;
-  static const List<String> _occasions = ['Office', 'Wedding', 'Gym', 'Travel', 'Daily Wear'];
-  String? _selectedOccasion;
   int _page = 1;
-  bool _hasMoreProducts = true;
-  Timer? _searchDebounce;
+  bool _hasMore = true;
+  Timer? _debounce;
 
-  static const double _maxWarehouseDistanceKm = 10;
+  static const _kOrange = Color(0xFFF47721);
+  static const _maxDistKm = 10.0;
 
-  static const List<_CategoryTileData> _defaultCategoryTiles = [
-    _CategoryTileData('Shirts', Icons.checkroom),
-    _CategoryTileData('T-Shirts', Icons.dry_cleaning),
-    _CategoryTileData('Jeans', Icons.straighten),
-    _CategoryTileData('Casual Pants', Icons.shopping_bag),
-    _CategoryTileData('Dresses', Icons.style),
-    _CategoryTileData('Western', Icons.nightlife),
-    _CategoryTileData('Indian', Icons.auto_awesome),
-    _CategoryTileData('Wedding', Icons.diamond),
-    _CategoryTileData('Summer', Icons.wb_sunny),
-    _CategoryTileData('Winter', Icons.ac_unit),
-    _CategoryTileData('Socks', Icons.sports_soccer),
-    _CategoryTileData('Ethnic', Icons.emoji_people),
-    _CategoryTileData('Sportswear', Icons.fitness_center),
-    _CategoryTileData('Kids Wear', Icons.child_care),
-    _CategoryTileData('Footwear', Icons.hiking),
+  static const _productTypes = [
+    'T-Shirt','Shirt','Jeans','Kurta','Dress','Shorts',
+    'Jacket','Hoodie','Trousers','Leggings','Saree','Footwear',
+  ];
+
+  static const _tagSections = [
+    {'title': 'Party Wear',    'keys': ['party','gown','dress']},
+    {'title': 'Casual Wear',   'keys': ['casual']},
+    {'title': 'Gym Wear',      'keys': ['gym','active','sports']},
+    {'title': 'Summer Picks',  'keys': ['summer','cotton','lightweight']},
+    {'title': 'Ethnic',        'keys': ['ethnic','kurta','saree']},
+    {'title': 'Formal',        'keys': ['formal','office','blazer']},
   ];
 
   @override
   void initState() {
     super.initState();
-    _initializeHome();
+    _init();
   }
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _initializeHome() async {
-    await _loadHomeFeed();
-    await _loadRecentProducts();
-    await _requestPermissionsAndLoadNearbyWarehouses();
-    await _loadBrowseProducts();
-  }
-
-  Future<void> _requestPermissionsAndLoadNearbyWarehouses() async {
-    await Permission.notification.request();
-
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      return;
-    }
-
-    final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    if (!mounted) return;
-
-    setState(() => _currentPosition = position);
-    await _loadNearbyWarehouses();
-  }
-
-  Future<void> _loadNearbyWarehouses() async {
-    if (_currentPosition == null) return;
-
-    setState(() => _warehouseLoading = true);
-    try {
-      final res = await ApiService().get('/shops', queryParams: {'limit': '100'});
-      final shops = (res['data'] as List? ?? []).cast<dynamic>();
-
-      final nearby = shops.where((shop) {
-        final distance = _distanceKm(shop);
-        return distance != null && distance <= _maxWarehouseDistanceKm;
-      }).toList();
-
-      nearby.sort((a, b) {
-        final da = _distanceKm(a) ?? 9999;
-        final db = _distanceKm(b) ?? 9999;
-        return da.compareTo(db);
-      });
-
-      setState(() {
-        _nearbyWarehouses = nearby;
-        _selectedWarehouse = nearby.isNotEmpty ? (nearby.first as Map<String, dynamic>) : null;
-      });
-    } catch (_) {
-      setState(() => _nearbyWarehouses = []);
-    } finally {
-      if (mounted) setState(() => _warehouseLoading = false);
-    }
-  }
-
-  double? _distanceKm(dynamic shop) {
-    if (_currentPosition == null) return null;
-    final lat = double.tryParse((shop['latitude'] ?? '').toString());
-    final lng = double.tryParse((shop['longitude'] ?? '').toString());
-    if (lat == null || lng == null) return null;
-
-    final meters = Geolocator.distanceBetween(
-      _currentPosition!.latitude,
-      _currentPosition!.longitude,
-      lat,
-      lng,
-    );
-    return meters / 1000;
-  }
-
-  void _chooseWarehouse() {
-    if (_nearbyWarehouses.isEmpty) return;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: ListView.separated(
-            itemCount: _nearbyWarehouses.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final shop = _nearbyWarehouses[index] as Map<String, dynamic>;
-              final distance = _distanceKm(shop);
-              final selected = _selectedWarehouse?['id'] == shop['id'];
-
-              return ListTile(
-                title: Text(shop['name'] ?? 'Warehouse'),
-                subtitle: Text('${shop['city'] ?? ''} - ${(distance ?? 0).toStringAsFixed(1)} km'),
-                trailing: selected ? const Icon(Icons.check_circle, color: Color(0xFFF47721)) : null,
-                onTap: () {
-                  setState(() => _selectedWarehouse = shop);
-                  Navigator.pop(context);
-                  _loadBrowseProducts();
-                },
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-
-
-  Future<void> _loadRecentProducts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final items = prefs.getStringList('recent_products') ?? [];
-    final parsed = items.map((e) {
-      try {
-        return jsonDecode(e) as Map<String, dynamic>;
-      } catch (_) {
-        return <String, dynamic>{};
-      }
-    }).where((e) => e.isNotEmpty).toList();
-
-    if (!mounted) return;
-    setState(() => _recentProducts = parsed);
-  }
-
-  void _updateSearchSuggestions(String input) {
-    _searchDebounce?.cancel();
-    final q = input.toLowerCase().trim();
-    if (q.isEmpty) {
-      setState(() => _searchSuggestions = []);
-      return;
-    }
-
-    final synonymMap = {
-      'tshirt': ['t-shirt', 'tee', 'tees'],
-      'tee': ['t-shirt', 'tshirt'],
-      'jean': ['jeans', 'denim'],
-      'sock': ['socks'],
-    };
-
-    final suggestions = <String>{q};
-    synonymMap.forEach((key, values) {
-      if (q.contains(key)) suggestions.addAll(values);
-    });
-
-    setState(() => _searchSuggestions = suggestions.toList());
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      if (!mounted) return;
-      _page = 1;
-      _loadBrowseProducts();
-    });
-  }
-
-  List<_CategoryTileData> _mergedCategories() {
-    final apiCategories = (_homeFeed?['categories'] as List? ?? [])
-        .map((c) => _CategoryTileData((c['name'] ?? '').toString(), Icons.checkroom, id: c['id']))
-        .where((c) => c.name.trim().isNotEmpty)
-        .toList();
-
-    final map = <String, _CategoryTileData>{
-      for (final item in _defaultCategoryTiles) item.name.toLowerCase(): item,
-    };
-    for (final item in apiCategories) {
-      map[item.name.toLowerCase()] = item;
-    }
-    return map.values.toList();
+  Future<void> _init() async {
+    await Future.wait([_loadHomeFeed(), _loadRecent(), _loadLocation()]);
+    await _loadProducts(reset: true);
   }
 
   Future<void> _loadHomeFeed() async {
     try {
       final res = await ApiService().get('/customers/home-feed');
-      setState(() {
-        _homeFeed = res['data'];
-        _loading = false;
+      if (mounted) setState(() { _homeFeed = res['data']; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadRecent() async {
+    final prefs = await SharedPreferences.getInstance();
+    final items = prefs.getStringList('recent_products') ?? [];
+    final parsed = items.map((e) {
+      try { return jsonDecode(e) as Map<String, dynamic>; } catch (_) { return <String, dynamic>{}; }
+    }).where((e) => e.isNotEmpty).toList();
+    if (mounted) setState(() => _recentProducts = parsed);
+  }
+
+  Future<void> _loadLocation() async {
+    await Permission.notification.request();
+    final svc = await Geolocator.isLocationServiceEnabled();
+    if (!svc) return;
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+    if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
+    final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+    if (!mounted) return;
+    setState(() => _currentPosition = pos);
+    await _loadWarehouses();
+  }
+
+  Future<void> _loadWarehouses() async {
+    if (_currentPosition == null) return;
+    try {
+      final res = await ApiService().get('/shops', queryParams: {'limit': '100'});
+      final shops = (res['data'] as List? ?? []).cast<dynamic>();
+      final nearby = shops.where((s) {
+        final d = _dist(s); return d != null && d <= _maxDistKm;
+      }).toList()..sort((a, b) => (_dist(a) ?? 9999).compareTo(_dist(b) ?? 9999));
+      if (mounted) setState(() {
+        _nearbyWarehouses = nearby;
+        _selectedWarehouse = nearby.isNotEmpty ? nearby.first as Map<String, dynamic> : null;
       });
-    } catch (e) {
-      setState(() => _loading = false);
-    }
+    } catch (_) {}
   }
 
-  List<Map<String, dynamic>> _applyLocalFilters(List<Map<String, dynamic>> items) {
-    final query = _searchController.text.trim().toLowerCase();
-    var filtered = items.where((p) {
-      final price = double.tryParse((p['price'] ?? '').toString()) ?? 0;
-      final discount = double.tryParse((p['discountPercent'] ?? p['discount'] ?? '').toString()) ?? 0;
-      final etaMins = int.tryParse((p['deliveryEtaMins'] ?? p['etaMins'] ?? '999').toString()) ?? 999;
-
-      final matchesPrice = _maxPriceFilter == null || price <= _maxPriceFilter!;
-      final matchesDiscount = discount >= _minDiscountFilter;
-      final matchesEta = !_etaUnder30Filter || etaMins <= 30;
-      return matchesPrice && matchesDiscount && matchesEta;
-    }).toList();
-
-    switch (_selectedSort) {
-      case 'price_low_to_high':
-        filtered.sort((a, b) => (double.tryParse((a['price'] ?? '').toString()) ?? 0)
-            .compareTo(double.tryParse((b['price'] ?? '').toString()) ?? 0));
-        break;
-      case 'best_rated':
-        filtered.sort((a, b) => (double.tryParse((b['avgRating'] ?? '').toString()) ?? 0)
-            .compareTo(double.tryParse((a['avgRating'] ?? '').toString()) ?? 0));
-        break;
-      case 'fastest_delivery':
-        filtered.sort((a, b) => (int.tryParse((a['deliveryEtaMins'] ?? a['etaMins'] ?? '999').toString()) ?? 999)
-            .compareTo(int.tryParse((b['deliveryEtaMins'] ?? b['etaMins'] ?? '999').toString()) ?? 999));
-        break;
-      default:
-        break;
-    }
-    if (query.isNotEmpty) {
-      filtered.sort((a, b) => _scoreSearchMatch(b, query).compareTo(_scoreSearchMatch(a, query)));
-    }
-    return filtered;
+  double? _dist(dynamic shop) {
+    if (_currentPosition == null) return null;
+    final lat = double.tryParse((shop['latitude'] ?? '').toString());
+    final lng = double.tryParse((shop['longitude'] ?? '').toString());
+    if (lat == null || lng == null) return null;
+    return Geolocator.distanceBetween(_currentPosition!.latitude, _currentPosition!.longitude, lat, lng) / 1000;
   }
 
-  int _scoreSearchMatch(Map<String, dynamic> product, String query) {
-    final name = (product['name'] ?? '').toString().toLowerCase();
-    final brand = (product['brand'] ?? '').toString().toLowerCase();
-    final category = (product['category']?['name'] ?? '').toString().toLowerCase();
-    final desc = (product['description'] ?? '').toString().toLowerCase();
-
-    int score = 0;
-    if (name.startsWith(query)) score += 50;
-    if (name.contains(query)) score += 35;
-    if (brand.contains(query)) score += 20;
-    if (category.contains(query)) score += 15;
-    if (desc.contains(query)) score += 10;
-    return score;
-  }
-
-  Future<void> _loadBrowseProducts() async {
+  Future<void> _loadProducts({bool reset = false}) async {
+    if (reset) { _page = 1; _hasMore = true; }
     setState(() => _productLoading = true);
     try {
-      final params = <String, String>{'limit': '20', 'page': '$_page'};
-      params['gender'] = _selectedGender;
-      if (_selectedCategoryId != null) params['categoryId'] = '$_selectedCategoryId';
-      if (_searchController.text.trim().isNotEmpty) {
-        final raw = _searchController.text.trim();
-        const synonymExpand = {'tshirt': 't-shirt tee', 'tee': 't-shirt', 'jean': 'jeans denim'};
-        String expanded = raw;
-        synonymExpand.forEach((k, v) { if (raw.toLowerCase().contains(k)) expanded = '$expanded $v'; });
-        params['search'] = expanded;
-      }
+      final params = <String, String>{'limit': '30', 'page': '$_page', 'gender': _selectedGender};
+      if (_selectedProductType != null) params['productType'] = _selectedProductType!;
       if (_selectedWarehouse != null) params['shopId'] = '${_selectedWarehouse!['id']}';
-
+      final q = _searchController.text.trim();
+      if (q.isNotEmpty) params['search'] = q;
       final res = await ApiService().get('/products', queryParams: params);
-      final products = (res['data'] as List? ?? [])
-          .whereType<Map>()
-          .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
-          .toList();
-      final filteredProducts = _applyLocalFilters(products);
-      setState(() {
-        _browseProducts = _page == 1 ? filteredProducts : [..._browseProducts, ...filteredProducts];
-        _hasMoreProducts = products.length >= 20;
+      final list = (res['data'] as List? ?? []).whereType<Map>()
+          .map((e) => e.map((k, v) => MapEntry(k.toString(), v))).toList();
+      if (mounted) setState(() {
+        _browseProducts = reset ? list : [..._browseProducts, ...list];
+        _hasMore = list.length >= 30;
       });
-      AnalyticsService().track('browse_products_loaded', props: {'page': _page, 'count': products.length});
-      if (_page == 1 && filteredProducts.isEmpty) {
-        AnalyticsService().track('browse_empty_state');
-      }
     } catch (_) {
-      setState(() => _browseProducts = []);
-      ErrorReporter.message('browse_products_load_failed');
+      if (mounted) setState(() { if (reset) _browseProducts = []; });
     } finally {
       if (mounted) setState(() => _productLoading = false);
     }
   }
 
-  List<Map<String, dynamic>> _genderFilteredProducts() {
-    return _browseProducts
-        .whereType<Map>()
+  List<Map<String, dynamic>> _sectionProducts(List<String> keys) {
+    return _browseProducts.whereType<Map>()
         .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
-        .where((p) => (p['gender'] ?? '').toString().toLowerCase() == _selectedGender)
-        .toList();
+        .where((p) {
+          final text = '${p['name']} ${p['description']} ${p['category']?['name'] ?? ''} ${(p['tags'] as List? ?? []).join(' ')}'.toLowerCase();
+          return keys.any((k) => text.contains(k));
+        }).take(10).toList();
   }
 
-  bool _matchesSection(Map<String, dynamic> product, List<String> keywords) {
-    final text = '${product['name'] ?? ''} ${product['description'] ?? ''} ${(product['category']?['name'] ?? '')}'
-        .toLowerCase();
-    final tags = (product['tags'] as List? ?? []).map((e) => e.toString().toLowerCase()).join(' ');
-    final content = '$text $tags';
-    for (final k in keywords) {
-      if (content.contains(k.toLowerCase())) return true;
-    }
-    return false;
+  List<Map<String, dynamic>> _personalizedProducts() {
+    if (_recentProducts.isEmpty) return _browseProducts.take(10).whereType<Map>()
+        .map((e) => e.map((k, v) => MapEntry(k.toString(), v))).toList();
+    final recentIds = _recentProducts.map((e) => e['id']).toSet();
+    final recentTypes = _recentProducts.map((e) => (e['productType'] ?? '')).toSet();
+    return _browseProducts.whereType<Map>()
+        .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
+        .where((p) => !recentIds.contains(p['id']) && recentTypes.contains(p['attributes']?['productType'] ?? ''))
+        .take(10).toList();
   }
 
-  List<Map<String, dynamic>> _sectionProducts(List<String> keywords) {
-    final filtered = _genderFilteredProducts();
-    final matched = filtered.where((p) => _matchesSection(p, keywords)).toList();
-    if (matched.length >= 5) return matched;
-    final extra = filtered.where((p) => !matched.contains(p)).take(5 - matched.length);
-    return [...matched, ...extra].take(12).toList();
-  }
-
-  List<String> _categoriesForGender() {
-    switch (_selectedGender) {
-      case 'women':
-        return ['Dresses', 'Tops', 'Kurtas', 'Sarees', 'Jeans', 'Leggings', 'Footwear', 'Heels', 'Ethnic', 'Nightwear', 'Activewear', 'Formals'];
-      case 'kids':
-        return ['T-Shirts', 'Shirts', 'Frocks', 'Shorts', 'Jeans', 'Track Pants', 'Footwear', 'School Wear', 'Party Wear', 'Winter Wear', 'Rain Wear', 'Ethnic'];
-      default:
-        return ['Shirts', 'Denim', 'Footwear', 'Kurta', 'Formals', 'T-Shirts', 'Underwear', 'Lowers', 'Pajama', 'Casual Pants', 'Activewear', 'Ethnic'];
-    }
-  }
-
-  List<Map<String, dynamic>> _tagRowsForGender() {
-    final now = DateTime.now();
-    final isSummer = now.month >= 3 && now.month <= 9;
-    final seasonal = isSummer
-        ? {'title': 'Summer Collection', 'keywords': ['summer', 'cotton', 'lightweight']}
-        : {'title': 'Winter Collection', 'keywords': ['winter', 'hoodie', 'wool', 'jacket']};
-
-    if (_selectedGender == 'women') {
-      return [
-        {'title': 'Party Wear', 'keywords': ['party', 'gown', 'dress']},
-        {'title': 'Casual Wear', 'keywords': ['casual']},
-        {'title': 'Gym Wear', 'keywords': ['gym', 'active', 'sports']},
-        seasonal,
-        {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
-      ];
-    }
-    if (_selectedGender == 'kids') {
-      return [
-        {'title': 'Party Wear', 'keywords': ['party']},
-        {'title': 'Casual Wear', 'keywords': ['casual']},
-        {'title': 'Sports Wear', 'keywords': ['sports', 'active', 'gym']},
-        seasonal,
-        {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
-      ];
-    }
-    return [
-      {'title': 'Party Wear', 'keywords': ['party']},
-      {'title': 'Casual Wear', 'keywords': ['casual']},
-      {'title': 'Gym Wear', 'keywords': ['gym', 'active', 'sports']},
-      seasonal,
-      {'title': 'Rain Wear', 'keywords': ['rain', 'waterproof']},
-    ];
-  }
-
-  List<Map<String, dynamic>> _browseProductsAsMap() {
-    return _browseProducts.whereType<Map>().map((e) => e.map((k, v) => MapEntry(k.toString(), v))).toList();
-  }
-
-  List<Map<String, dynamic>> _recentlyDroppedPrices() {
-    return _browseProductsAsMap().where((p) {
-      final discount = double.tryParse((p['discount'] ?? p['discountPercent'] ?? '0').toString()) ?? 0;
-      return discount >= 25;
-    }).take(10).toList();
-  }
-
-  List<Map<String, dynamic>> _backInStockProducts() {
-    return _browseProductsAsMap().where((p) {
-      final stock = int.tryParse((p['quantity'] ?? p['stock'] ?? '0').toString()) ?? 0;
-      return stock > 0;
-    }).take(10).toList();
-  }
-
-  List<Map<String, dynamic>> _becauseYouViewed() {
-    final recentIds = _recentProducts.map((e) => e['id']).whereType<int>().toSet();
-    if (recentIds.isEmpty) return [];
-    return _browseProductsAsMap().where((p) => !recentIds.contains(p['id'])).take(10).toList();
+  void _onSearchChanged(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () => _loadProducts(reset: true));
   }
 
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
-    final categories = _mergedCategories();
-    final hasSearch = _searchController.text.trim().isNotEmpty;
+    final auth = context.watch<AuthProvider>();
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F8F8),
       appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Feriwala', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFFF47721))),
-            Text('Browse first, login at checkout', style: TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-        actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined),
-                onPressed: () => Navigator.pushNamed(context, '/cart'),
-              ),
-              if (cart.itemCount > 0)
-                Positioned(
-                  right: 4,
-                  top: 4,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Color(0xFFF47721), shape: BoxShape.circle),
-                    child: Text('${cart.itemCount}', style: const TextStyle(color: Colors.white, fontSize: 10)),
-                  ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        titleSpacing: 16,
+        title: _searchActive
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search clothes, shoes...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.grey.shade400),
                 ),
-            ],
+                onChanged: _onSearchChanged,
+                onSubmitted: (_) => _loadProducts(reset: true),
+              )
+            : Row(children: [
+                Text('feriwala', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: _kOrange, letterSpacing: -0.5)),
+                if (_selectedWarehouse != null) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _pickWarehouse,
+                    child: Row(children: [
+                      Icon(Icons.location_on, size: 14, color: Colors.grey.shade500),
+                      Text(
+                        (_selectedWarehouse!['name'] as String? ?? '').split(' ').first,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.grey.shade500),
+                    ]),
+                  ),
+                ],
+              ]),
+        actions: [
+          IconButton(
+            icon: Icon(_searchActive ? Icons.close : Icons.search, color: Colors.black87),
+            onPressed: () {
+              setState(() {
+                _searchActive = !_searchActive;
+                if (!_searchActive) { _searchController.clear(); _loadProducts(reset: true); }
+              });
+            },
           ),
+          Stack(children: [
+            IconButton(
+              icon: const Icon(Icons.shopping_bag_outlined, color: Colors.black87),
+              onPressed: () => Navigator.pushNamed(context, '/cart'),
+            ),
+            if (cart.itemCount > 0) Positioned(
+              right: 6, top: 6,
+              child: Container(
+                width: 16, height: 16,
+                decoration: const BoxDecoration(color: _kOrange, shape: BoxShape.circle),
+                child: Center(child: Text('${cart.itemCount}', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold))),
+              ),
+            ),
+          ]),
+          if (!auth.isAuthenticated)
+            TextButton(
+              onPressed: () => Navigator.pushNamed(context, '/login'),
+              child: const Text('Login', style: TextStyle(color: _kOrange, fontWeight: FontWeight.w600)),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.person_outline, color: Colors.black87),
+              onPressed: () => Navigator.pushNamed(context, '/profile'),
+            ),
+          const SizedBox(width: 4),
         ],
       ),
-      endDrawer: hasSearch
-          ? Drawer(
-              child: SafeArea(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text('Filters', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _selectedSort,
-                      decoration: const InputDecoration(labelText: 'Sort by'),
-                      items: const [
-                        DropdownMenuItem(value: 'trending', child: Text('Trending')),
-                        DropdownMenuItem(value: 'fastest_delivery', child: Text('Fastest Delivery')),
-                        DropdownMenuItem(value: 'best_rated', child: Text('Best Rated')),
-                        DropdownMenuItem(value: 'price_low_to_high', child: Text('Price Low to High')),
-                      ],
-                      onChanged: (value) => setState(() => _selectedSort = value ?? 'trending'),
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      value: _etaUnder30Filter,
-                      onChanged: (v) => setState(() => _etaUnder30Filter = v),
-                      title: const Text('ETA under 30 mins'),
-                    ),
-                    const SizedBox(height: 8),
-                    FilterChip(
-                      label: const Text('Under ₹499'),
-                      selected: _maxPriceFilter == 499,
-                      onSelected: (selected) => setState(() => _maxPriceFilter = selected ? 499 : null),
-                    ),
-                    const SizedBox(height: 8),
-                    FilterChip(
-                      label: const Text('30%+ Off'),
-                      selected: _minDiscountFilter == 30,
-                      onSelected: (selected) => setState(() => _minDiscountFilter = selected ? 30 : 0),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        _page = 1;
-                        _loadBrowseProducts();
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Apply Filters'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedSort = 'trending';
-                          _maxPriceFilter = null;
-                          _minDiscountFilter = 0;
-                          _etaUnder30Filter = false;
-                        });
-                      },
-                      child: const Text('Clear all'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: () async {
-                _page = 1;
-                await _loadHomeFeed();
-                await _requestPermissionsAndLoadNearbyWarehouses();
-                await _loadBrowseProducts();
-              },
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8F9FB),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.my_location, color: Color(0xFFF47721)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _currentPosition == null
-                                        ? 'Location not available'
-                                        : 'Lat ${_currentPosition!.latitude.toStringAsFixed(4)}, Lng ${_currentPosition!.longitude.toStringAsFixed(4)}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.refresh),
-                                  onPressed: _requestPermissionsAndLoadNearbyWarehouses,
-                                  tooltip: 'Refresh GPS',
-                                ),
-                              ],
-                            ),
-                            if (_warehouseLoading)
-                              const Text('Fetching nearby warehouses...')
-                            else if (_nearbyWarehouses.isEmpty)
-                              const Text('No nearby warehouses found.'),
-                            if (_nearbyWarehouses.isNotEmpty)
-                              DropdownButtonFormField<int>(
-                                initialValue: (_selectedWarehouse?['id'] as num?)?.toInt(),
-                                decoration: const InputDecoration(labelText: 'Selected Warehouse'),
-                                items: _nearbyWarehouses
-                                    .map((w) => DropdownMenuItem<int>(
-                                          value: (w['id'] as num?)?.toInt(),
-                                          child: Text('${w['name']} - ${(_distanceKm(w) ?? 0).toStringAsFixed(1)} km'),
-                                        ))
-                                    .toList(),
-                                onChanged: (id) {
-                                  final found = _nearbyWarehouses.firstWhere(
-                                    (w) => (w['id'] as num?)?.toInt() == id,
-                                    orElse: () => null,
-                                  );
-                                  if (found != null) {
-                                    setState(() => _selectedWarehouse = found as Map<String, dynamic>);
-                                    _page = 1;
-                                    _loadBrowseProducts();
-                                  }
-                                },
-                              ),
-                          ],
-                        ),
+              onRefresh: () => _init(),
+              child: CustomScrollView(
+                slivers: [
+                  // Gender tabs
+                  SliverToBoxAdapter(child: _genderTabs()),
+                  // Product type chips
+                  SliverToBoxAdapter(child: _productTypeChips()),
+                  // Recently viewed
+                  if (_recentProducts.isNotEmpty)
+                    SliverToBoxAdapter(child: _sectionRow(
+                      'Recently Viewed',
+                      _recentProducts.map((p) => _toMap(p)).toList(),
+                      searchKeys: [],
+                    )),
+                  // Personalized
+                  if (_personalizedProducts().isNotEmpty)
+                    SliverToBoxAdapter(child: _sectionRow(
+                      'Picked for You',
+                      _personalizedProducts(),
+                      searchKeys: [],
+                    )),
+                  // Tag sections
+                  ..._tagSections.map((s) {
+                    final products = _sectionProducts((s['keys'] as List).cast<String>());
+                    if (products.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+                    return SliverToBoxAdapter(child: _sectionRow(
+                      s['title'] as String,
+                      products,
+                      searchKeys: (s['keys'] as List).cast<String>(),
+                    ));
+                  }),
+                  // Browse grid header
+                  SliverToBoxAdapter(child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+                    child: Row(children: [
+                      Text(
+                        _selectedProductType != null ? _selectedProductType! : 'All Products',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      if (_productLoading) const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ]),
+                  )),
+                  // Product grid (minimum 3 rows = 6 items)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    sliver: SliverGrid(
+                      delegate: SliverChildBuilderDelegate(
+                        (ctx, i) => _ProductCard(product: _browseProducts[i] as Map<String, dynamic>),
+                        childCount: _browseProducts.length,
+                      ),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.65,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: InputDecoration(
-                                hintText: 'Search shirts, jeans, dresses, socks...',
-                                prefixIcon: const Icon(Icons.search),
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.arrow_forward),
-                                  onPressed: () {
-                                    AnalyticsService().track('search_submitted', props: {'source': 'arrow'});
-                                    _page = 1;
-                                    _loadBrowseProducts();
-                                  },
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey[100],
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                              ),
-                              onChanged: _updateSearchSuggestions,
-                              onSubmitted: (_) {
-                                AnalyticsService().track('search_submitted', props: {'source': 'keyboard'});
-                                _page = 1;
-                                _loadBrowseProducts();
-                              },
-                            ),
-                          ),
-                          if (hasSearch) ...[
-                            const SizedBox(width: 8),
-                            IconButton(
-                              onPressed: () => Scaffold.of(context).openEndDrawer(),
-                              icon: const Icon(Icons.tune),
-                              tooltip: 'More filters',
-                            ),
-                          ],
-                        ],
-                      ),
+                  ),
+                  // Load more
+                  if (_hasMore) SliverToBoxAdapter(child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: OutlinedButton(
+                      onPressed: _productLoading ? null : () { _page++; _loadProducts(); },
+                      child: const Text('Load more'),
                     ),
-                    if (_searchSuggestions.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Wrap(
-                          spacing: 8,
-                          children: _searchSuggestions.map((s) => ActionChip(label: Text(s), onPressed: () {
-                            _searchController.text = s;
-                            _page = 1;
-                            AnalyticsService().track('search_suggestion_clicked', props: {'suggestion': s});
-                            _loadBrowseProducts();
-                          })).toList(),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: SizedBox(
-                        height: 40,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: _occasions
-                              .map((occasion) => Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: ChoiceChip(
-                                      label: Text(occasion),
-                                      selected: _selectedOccasion == occasion,
-                                      onSelected: (_) {
-                                        setState(() => _selectedOccasion = _selectedOccasion == occasion ? null : occasion);
-                                        AnalyticsService().track('occasion_chip_clicked', props: {'occasion': occasion});
-                                      },
-                                    ),
-                                  ))
-                              .toList(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: SegmentedButton<String>(
-                              segments: const [
-                                ButtonSegment(value: 'men', label: Text("Men's Collection")),
-                                ButtonSegment(value: 'women', label: Text("Women's Collection")),
-                                ButtonSegment(value: 'kids', label: Text("Kids Collection")),
-                              ],
-                              selected: {_selectedGender},
-                              onSelectionChanged: (set) {
-                                setState(() => _selectedGender = set.first);
-                                _page = 1;
-                                AnalyticsService().track('gender_changed', props: {'gender': set.first});
-                                _loadBrowseProducts();
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          const Text('Categories', style: TextStyle(fontWeight: FontWeight.bold)),
-                          const Spacer(),
-                          IconButton(
-                            icon: Icon(_categoriesExpanded ? Icons.expand_less : Icons.expand_more),
-                            onPressed: () => setState(() => _categoriesExpanded = !_categoriesExpanded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      height: _categoriesExpanded ? 96 : 48,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        children: _categoriesForGender().map((name) => Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(name),
-                            selected: _selectedCategoryName == name,
-                            onSelected: (_) {
-                              setState(() {
-                                if (_selectedCategoryName == name) {
-                                  _selectedCategoryId = null;
-                                  _selectedCategoryName = 'All';
-                                } else {
-                                  _selectedCategoryId = categories.firstWhere(
-                                    (c) => c.name.toLowerCase() == name.toLowerCase(),
-                                    orElse: () => const _CategoryTileData('', Icons.checkroom),
-                                  ).id;
-                                  _selectedCategoryName = name;
-                                }
-                              });
-                              _page = 1;
-                              AnalyticsService().track('category_changed', props: {'category': _selectedCategoryName});
-                              _loadBrowseProducts();
-                            },
-                          ),
-                        )).toList(),
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-                    if (_recentProducts.isNotEmpty) ...[
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Text('Recently Viewed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      ),
-                      SizedBox(
-                        height: 120,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: _recentProducts.length,
-                          itemBuilder: (context, index) {
-                            final rp = _recentProducts[index];
-                            return GestureDetector(
-                              onTap: () => Navigator.pushNamed(context, '/product', arguments: rp['id']),
-                              child: Container(
-                                width: 110,
-                                margin: const EdgeInsets.only(right: 10),
-                                child: Column(children: [
-                                  Expanded(child: Container(color: Colors.grey.shade200, child: rp['image'] != null ? Image.network(rp['image'], fit: BoxFit.cover) : const Icon(Icons.checkroom))),
-                                  Text(rp['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
-                                ]),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                    _SectionRow(title: 'Personalized for you', products: _becauseYouViewed()),
-                    ..._tagRowsForGender().map((row) => _SectionRow(
-                          title: row['title'] as String,
-                          products: _sectionProducts((row['keywords'] as List).map((e) => e.toString()).toList()),
-                        )),
-                    if (_selectedOccasion != null)
-                      _SectionRow(title: '$_selectedOccasion Picks', products: _sectionProducts([_selectedOccasion!.toLowerCase()])),
-                    _SectionRow(title: 'Trending in your area', products: _browseProductsAsMap().take(8).toList()),
-                    _SectionRow(title: 'Selling fast near you', products: _browseProductsAsMap().reversed.take(8).toList()),
-                    _SectionRow(title: 'New arrivals today', products: _browseProductsAsMap().take(8).toList()),
-                    _SectionRow(title: 'Budget Picks Under ₹499', products: _browseProductsAsMap().where((p) => (double.tryParse((p['sellingPrice'] ?? p['price'] ?? '0').toString()) ?? 0) <= 499).take(8).toList()),
-                    _SectionRow(title: 'Premium Styles Above ₹999', products: _browseProductsAsMap().where((p) => (double.tryParse((p['sellingPrice'] ?? p['price'] ?? '0').toString()) ?? 0) >= 999).take(8).toList()),
-                    _SectionRow(title: 'Recently Dropped Prices', products: _recentlyDroppedPrices()),
-                    _SectionRow(title: 'Back in Stock for You', products: _backInStockProducts()),
-                    _SectionRow(title: 'Because you viewed', products: _becauseYouViewed()),
-                    if (!_productLoading && _browseProducts.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(child: Text('No products found. Try changing search/filters.')),
-                      ),
-                    if (_hasMoreProducts && !_productLoading && _browseProducts.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Center(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              _page += 1;
-                              _loadBrowseProducts();
-                            },
-                            icon: const Icon(Icons.expand_more),
-                            label: const Text('Load more products'),
-                          ),
-                        ),
-                      ),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: Text('Featured', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                    if (_homeFeed?['featured'] != null && (_homeFeed!['featured'] as List).isNotEmpty)
-                      SizedBox(
-                        height: 220,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: (_homeFeed!['featured'] as List).length,
-                          itemBuilder: (context, index) {
-                            final product = _homeFeed!['featured'][index];
-                            return _ProductCard(product: product);
-                          },
-                        ),
-                      ),
-                    if (_hasMoreProducts && !_productLoading && _browseProducts.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              _page += 1;
-                              AnalyticsService().track('browse_load_more', props: {'page': _page});
-                              _loadBrowseProducts();
-                            },
-                            icon: const Icon(Icons.expand_more),
-                            label: const Text('Load more'),
-                          ),
-                        ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Text(
-                        _selectedCategoryId == null
-                            ? 'Browse Products'
-                            : 'Browse Products - $_selectedCategoryName',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    if (_productLoading)
-                      const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                    else if (_browseProducts.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(18),
-                        child: Center(child: Text('No products found for current filters.')),
-                      )
-                    else
-                      Column(children: [
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.65,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: _browseProducts.length,
-                          itemBuilder: (context, index) => _ProductGridItem(product: _browseProducts[index]),
-                        ),
-                        if (_hasMoreProducts)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 10),
-                            child: OutlinedButton(
-                              onPressed: _productLoading ? null : () {
-                                _page += 1;
-                                AnalyticsService().track('load_more_clicked', props: {'next_page': _page});
-                                _loadBrowseProducts();
-                              },
-                              child: const Text('Load more'),
-                            ),
-                          ),
-                      ]),
-                    const SizedBox(height: 80),
-                  ],
-                ),
+                  )),
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                ],
               ),
             ),
-
       floatingActionButton: cart.itemCount > 0
           ? FloatingActionButton.extended(
               onPressed: () => Navigator.pushNamed(context, '/cart'),
-              backgroundColor: const Color(0xFFF47721),
-              icon: const Icon(Icons.shopping_cart, color: Colors.white),
-              label: Text('${cart.itemCount} items', style: const TextStyle(color: Colors.white)),
+              backgroundColor: _kOrange,
+              icon: const Icon(Icons.shopping_bag, color: Colors.white),
+              label: Text('₹${cart.total.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             )
           : null,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
+        currentIndex: 0,
         onTap: (i) {
-          setState(() => _currentIndex = i);
           if (i == 1) Navigator.pushNamed(context, '/orders');
           if (i == 2) Navigator.pushNamed(context, '/profile');
         },
-        selectedItemColor: const Color(0xFFF47721),
+        selectedItemColor: _kOrange,
+        unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Orders'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), activeIcon: Icon(Icons.receipt_long), label: 'Orders'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
     );
   }
-}
 
-class _CategoryTileData {
-  final String name;
-  final IconData icon;
-  final int? id;
-  const _CategoryTileData(this.name, this.icon, {this.id});
-}
-
-class _SectionRow extends StatelessWidget {
-  final String title;
-  final List<Map<String, dynamic>> products;
-  const _SectionRow({required this.title, required this.products});
-
-  @override
-  Widget build(BuildContext context) {
-    if (products.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-          child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        ),
-        SizedBox(
-          height: 220,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: products.length,
-            itemBuilder: (context, index) => _ProductCard(product: products[index]),
-          ),
-        ),
-      ],
-    );
+  Map<String, dynamic> _toMap(dynamic p) {
+    if (p is Map<String, dynamic>) return p;
+    if (p is Map) return p.map((k, v) => MapEntry(k.toString(), v));
+    return {};
   }
-}
 
-class _CategoryTile extends StatelessWidget {
-  final _CategoryTileData category;
-  final bool selected;
-  final VoidCallback onTap;
-  const _CategoryTile({required this.category, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: selected ? const Color(0xFFF47721).withAlpha(45) : const Color(0xFFF47721).withAlpha(20),
-                borderRadius: BorderRadius.circular(10),
-                border: selected ? Border.all(color: const Color(0xFFF47721), width: 1.2) : null,
-              ),
-              child: Icon(category.icon, color: const Color(0xFFF47721), size: 22),
+  Widget _genderTabs() {
+    final genders = [('Men', 'men'), ('Women', 'women'), ('Kids', 'kids')];
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(children: genders.map((g) {
+        final selected = _selectedGender == g.$2;
+        return Expanded(child: GestureDetector(
+          onTap: () { setState(() => _selectedGender = g.$2); _loadProducts(reset: true); },
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? _kOrange : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: Text(g.$1, textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13,
+                color: selected ? Colors.white : Colors.black87)),
           ),
-          const SizedBox(height: 4),
-          Text(
-            category.name,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 10.5),
-          ),
+        ));
+      }).toList()),
+    );
+  }
+
+  Widget _productTypeChips() {
+    return Container(
+      color: Colors.white,
+      height: 44,
+      margin: const EdgeInsets.only(bottom: 4),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        children: [
+          _typeChip('All', null),
+          ..._productTypes.map((t) => _typeChip(t, t)),
         ],
       ),
+    );
+  }
+
+  Widget _typeChip(String label, String? value) {
+    final selected = _selectedProductType == value;
+    return GestureDetector(
+      onTap: () { setState(() => _selectedProductType = value); _loadProducts(reset: true); },
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? _kOrange : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? _kOrange : Colors.grey.shade300),
+        ),
+        child: Text(label, style: TextStyle(
+          fontSize: 12, fontWeight: FontWeight.w500,
+          color: selected ? Colors.white : Colors.black87,
+        )),
+      ),
+    );
+  }
+
+  Widget _sectionRow(String title, List<Map<String, dynamic>> products, {required List<String> searchKeys}) {
+    if (products.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Row(children: [
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => Navigator.pushNamed(context, '/category-products', arguments: {'title': title, 'searchKeys': searchKeys}),
+            child: Row(children: [
+              const Text('See all', style: TextStyle(fontSize: 12, color: _kOrange, fontWeight: FontWeight.w500)),
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_forward_ios, size: 12, color: _kOrange),
+            ]),
+          ),
+        ]),
+      ),
+      SizedBox(
+        height: 210,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: products.length,
+          itemBuilder: (_, i) => _ProductCard(product: products[i], compact: true),
+        ),
+      ),
+    ]);
+  }
+
+  void _pickWarehouse() {
+    if (_nearbyWarehouses.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Padding(padding: EdgeInsets.all(16), child: Text('Select Store', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+        ..._nearbyWarehouses.map((w) {
+          final d = _dist(w);
+          final sel = _selectedWarehouse?['id'] == w['id'];
+          return ListTile(
+            title: Text(w['name'] ?? ''),
+            subtitle: Text(d != null ? '${d.toStringAsFixed(1)} km away' : ''),
+            trailing: sel ? const Icon(Icons.check_circle, color: _kOrange) : null,
+            onTap: () {
+              setState(() => _selectedWarehouse = w as Map<String, dynamic>);
+              Navigator.pop(context);
+              _loadProducts(reset: true);
+            },
+          );
+        }),
+      ])),
     );
   }
 }
 
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
-  const _ProductCard({required this.product});
+  final bool compact;
+  const _ProductCard({required this.product, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
-    final images = product['images'] as List? ?? [];
+    final images = (product['images'] as List? ?? []);
+    final name = product['name'] ?? '';
+    final price = product['sellingPrice']?.toString() ?? '';
+    final mrp = product['mrp']?.toString() ?? '';
+    final discount = double.tryParse((product['discount'] ?? '0').toString()) ?? 0;
+    final brand = product['brand'] ?? '';
+
     return GestureDetector(
-      onTap: () {
-        AnalyticsService().track('product_clicked', props: {'productId': product['id'], 'surface': 'rail_card'});
-        Navigator.pushNamed(context, '/product', arguments: product['id']);
-      },
+      onTap: () => Navigator.pushNamed(context, '/product', arguments: product['id']),
       child: Container(
-        width: 160,
-        margin: const EdgeInsets.only(right: 12),
+        width: compact ? 140 : null,
+        margin: compact ? const EdgeInsets.only(right: 10) : null,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.grey.withAlpha(25), blurRadius: 8, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.black.withAlpha(12), blurRadius: 6, offset: const Offset(0, 2))],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: Container(
-                  height: 140,
-                  color: Colors.grey[200],
-                  child: images.isNotEmpty
-                    ? Image.network(images[0], fit: BoxFit.cover, width: double.infinity, loadingBuilder: (c, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)))
-                    : const Center(child: Icon(Icons.checkroom, size: 40, color: Colors.grey)),
-              ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: AspectRatio(
+              aspectRatio: 0.9,
+              child: images.isNotEmpty
+                  ? Image.network(images[0], fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.checkroom, color: Colors.grey)))
+                  : Container(color: Colors.grey.shade100, child: const Icon(Icons.checkroom, color: Colors.grey, size: 40)),
             ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(product['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    Text('INR ${product['sellingPrice']}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
-                    const SizedBox(width: 4),
-                    if (product['mrp'] != product['sellingPrice'])
-                      Text('INR ${product['mrp']}',
-                          style: const TextStyle(decoration: TextDecoration.lineThrough, fontSize: 11, color: Colors.grey)),
-                  ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (brand.isNotEmpty) Text(brand, style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
+              Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 4),
+              Row(children: [
+                Text('₹$price', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFF47721))),
+                if (mrp != price && mrp.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  Text('₹$mrp', style: const TextStyle(decoration: TextDecoration.lineThrough, fontSize: 11, color: Colors.grey)),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProductGridItem extends StatelessWidget {
-  final Map<String, dynamic> product;
-  const _ProductGridItem({required this.product});
-
-  @override
-  Widget build(BuildContext context) {
-    final images = product['images'] as List? ?? [];
-    final sizes = (product['size'] ?? '').toString().split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(2).toList();
-    final colors = (product['color'] ?? '').toString().split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(2).toList();
-    return GestureDetector(
-      onTap: () {
-        AnalyticsService().track('product_clicked', props: {'productId': product['id'], 'surface': 'browse_grid'});
-        Navigator.pushNamed(context, '/product', arguments: product['id']);
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.grey.withAlpha(25), blurRadius: 8)],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: Container(
-                  width: double.infinity,
-                  color: Colors.grey[200],
-                  child: images.isNotEmpty
-                      ? Image.network(images[0], fit: BoxFit.cover, loadingBuilder: (c, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)))
-                      : const Center(child: Icon(Icons.checkroom, size: 40, color: Colors.grey)),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (product['brand'] != null)
-                    Text(product['brand'], style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                  Text(product['name'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    Text('INR ${product['sellingPrice']}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
-                    const SizedBox(width: 4),
-                    if (product['discount'] != null && double.tryParse(product['discount'].toString()) != null && double.parse(product['discount'].toString()) > 0)
-                      Text('${double.parse(product['discount'].toString()).toStringAsFixed(0)}% off',
-                          style: const TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.w500)),
-                  ]),
-                  const SizedBox(height: 4),
-                  if (sizes.isNotEmpty || colors.isNotEmpty)
-                    Wrap(
-                      spacing: 4,
-                      children: [
-                        ...sizes.map((s) => Chip(label: Text(s, style: const TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact)),
-                        ...colors.map((c) => Chip(label: Text(c, style: const TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact)),
-                      ],
-                    ),
-                  const SizedBox(height: 4),
-                  const Wrap(
-                    spacing: 4,
-                    runSpacing: -8,
-                    children: [
-                      Chip(label: Text('Easy returns', style: TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact),
-                      Chip(label: Text('Verified seller', style: TextStyle(fontSize: 9)), visualDensity: VisualDensity.compact),
-                    ],
-                  ),
-                  Text(
-                    'Quick view: color/size options',
-                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        AnalyticsService().track('quick_add_clicked', props: {'productId': product['id']});
-                        Navigator.pushNamed(context, '/product', arguments: product['id']);
-                      },
-                      child: const Text('Quick Add'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+              ]),
+              if (discount > 0)
+                Text('${discount.toStringAsFixed(0)}% off', style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.w500)),
+            ]),
+          ),
+        ]),
       ),
     );
   }

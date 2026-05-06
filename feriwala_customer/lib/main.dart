@@ -14,6 +14,10 @@ import 'screens/home_screen.dart';
 import 'screens/product_detail_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/checkout_screen.dart';
+import 'screens/address_selection_screen.dart';
+import 'screens/payment_selection_screen.dart';
+import 'screens/order_review_screen.dart';
+import 'screens/category_products_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/order_tracking_screen.dart';
 import 'screens/profile_screen.dart';
@@ -102,6 +106,8 @@ class FeriwalaCustomerApp extends StatelessWidget {
           '/home': (context) => const HomeScreen(),
           '/cart': (context) => const CartScreen(),
           '/checkout': (context) => const CheckoutScreen(),
+          '/address-selection': (context) => const AddressSelectionScreen(),
+          '/payment-selection': (context) => const PaymentSelectionScreen(),
           '/orders': (context) => const OrdersScreen(),
           '/profile': (context) => const ProfileScreen(),
           '/privacy': (context) => const PrivacyPolicyScreen(),
@@ -120,6 +126,26 @@ class FeriwalaCustomerApp extends StatelessWidget {
             if (orderId == null) return _invalidRoute('/order-tracking');
             return MaterialPageRoute(
               builder: (context) => OrderTrackingScreen(orderId: orderId),
+            );
+          }
+          if (settings.name == '/category-products') {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null) return _invalidRoute('/category-products');
+            return MaterialPageRoute(
+              builder: (context) => CategoryProductsScreen(
+                title: args['title'] as String,
+                searchKeys: (args['searchKeys'] as List).cast<String>(),
+              ),
+            );
+          }
+          if (settings.name == '/order-review') {
+            final args = settings.arguments as Map<String, dynamic>?;
+            if (args == null) return _invalidRoute('/order-review');
+            return MaterialPageRoute(
+              builder: (context) => OrderReviewScreen(
+                address: args['address'] as Map<String, dynamic>,
+                paymentMethod: args['paymentMethod'] as String,
+              ),
             );
           }
           return null;
