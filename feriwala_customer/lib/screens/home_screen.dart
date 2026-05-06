@@ -433,9 +433,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final categories = _mergedCategories();
+    final hasSearch = _searchController.text.trim().isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -467,6 +475,68 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      endDrawer: hasSearch
+          ? Drawer(
+              child: SafeArea(
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    const Text('Filters', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _selectedSort,
+                      decoration: const InputDecoration(labelText: 'Sort by'),
+                      items: const [
+                        DropdownMenuItem(value: 'trending', child: Text('Trending')),
+                        DropdownMenuItem(value: 'fastest_delivery', child: Text('Fastest Delivery')),
+                        DropdownMenuItem(value: 'best_rated', child: Text('Best Rated')),
+                        DropdownMenuItem(value: 'price_low_to_high', child: Text('Price Low to High')),
+                      ],
+                      onChanged: (value) => setState(() => _selectedSort = value ?? 'trending'),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      value: _etaUnder30Filter,
+                      onChanged: (v) => setState(() => _etaUnder30Filter = v),
+                      title: const Text('ETA under 30 mins'),
+                    ),
+                    const SizedBox(height: 8),
+                    FilterChip(
+                      label: const Text('Under ₹499'),
+                      selected: _maxPriceFilter == 499,
+                      onSelected: (selected) => setState(() => _maxPriceFilter = selected ? 499 : null),
+                    ),
+                    const SizedBox(height: 8),
+                    FilterChip(
+                      label: const Text('30%+ Off'),
+                      selected: _minDiscountFilter == 30,
+                      onSelected: (selected) => setState(() => _minDiscountFilter = selected ? 30 : 0),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        _page = 1;
+                        _loadBrowseProducts();
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Apply Filters'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedSort = 'trending';
+                          _maxPriceFilter = null;
+                          _minDiscountFilter = 0;
+                          _etaUnder30Filter = false;
+                        });
+                      },
+                      child: const Text('Clear all'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -518,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               const Text('No nearby warehouses found.'),
                             if (_nearbyWarehouses.isNotEmpty)
                               DropdownButtonFormField<int>(
-                                value: (_selectedWarehouse?['id'] as num?)?.toInt(),
+                                initialValue: (_selectedWarehouse?['id'] as num?)?.toInt(),
                                 decoration: const InputDecoration(labelText: 'Selected Warehouse'),
                                 items: _nearbyWarehouses
                                     .map((w) => DropdownMenuItem<int>(
@@ -545,32 +615,46 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.all(16),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search shirts, jeans, dresses, socks...',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.arrow_forward),
-                            onPressed: () {
-                              AnalyticsService().track('search_submitted', props: {'source': 'arrow'});
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                hintText: 'Search shirts, jeans, dresses, socks...',
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.arrow_forward),
+                                  onPressed: () {
+                                    AnalyticsService().track('search_submitted', props: {'source': 'arrow'});
+                                    _page = 1;
+                                    _loadBrowseProducts();
+                                  },
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey[100],
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              onChanged: _updateSearchSuggestions,
+                              onSubmitted: (_) {
+                                AnalyticsService().track('search_submitted', props: {'source': 'keyboard'});
+                                _page = 1;
+                                _loadBrowseProducts();
+                              },
+                            ),
                           ),
-                          filled: true,
-                          fillColor: Colors.grey[100],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        onChanged: _updateSearchSuggestions,
-                        onSubmitted: (_) {
-                          AnalyticsService().track('search_submitted', props: {'source': 'keyboard'});
-                          _page = 1;
-                          _loadBrowseProducts();
-                        },
+                          if (hasSearch) ...[
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: () => Scaffold.of(context).openEndDrawer(),
+                              icon: const Icon(Icons.tune),
+                              tooltip: 'More filters',
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     if (_searchSuggestions.isNotEmpty)
@@ -586,41 +670,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           })).toList(),
                         ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Image-led search will be enabled in an upcoming update.')),
-                              ),
-                              icon: const Icon(Icons.camera_alt_outlined),
-                              label: const Text('Upload photo'),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Voice search will be enabled in an upcoming update.')),
-                            ),
-                            icon: const Icon(Icons.mic_none),
-                          ),
-                          ActionChip(
-                            label: const Text('Clear Filters'),
-                            onPressed: () {
-                              setState(() {
-                                _maxPriceFilter = null;
-                                _minDiscountFilter = 0;
-                                _etaUnder30Filter = false;
-                                _selectedSort = 'trending';
-                              });
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -665,19 +714,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                           ),
-                          ActionChip(
-                            label: const Text('Clear Filters'),
-                            onPressed: () {
-                              setState(() {
-                                _maxPriceFilter = null;
-                                _minDiscountFilter = 0;
-                                _etaUnder30Filter = false;
-                                _selectedSort = 'trending';
-                              });
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
-                          ),
                         ],
                       ),
                     ),
@@ -691,19 +727,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           IconButton(
                             icon: Icon(_categoriesExpanded ? Icons.expand_less : Icons.expand_more),
                             onPressed: () => setState(() => _categoriesExpanded = !_categoriesExpanded),
-                          ),
-                          ActionChip(
-                            label: const Text('Clear Filters'),
-                            onPressed: () {
-                              setState(() {
-                                _maxPriceFilter = null;
-                                _minDiscountFilter = 0;
-                                _etaUnder30Filter = false;
-                                _selectedSort = 'trending';
-                              });
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
                           ),
                         ],
                       ),
@@ -740,76 +763,36 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
 
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          DropdownButton<String>(
-                            value: _selectedSort,
-                            items: const [
-                              DropdownMenuItem(value: 'trending', child: Text('Trending')),
-                              DropdownMenuItem(value: 'fastest_delivery', child: Text('Fastest Delivery')),
-                              DropdownMenuItem(value: 'best_rated', child: Text('Best Rated')),
-                              DropdownMenuItem(value: 'price_low_to_high', child: Text('Price Low to High')),
-                            ],
-                            onChanged: (value) {
-                              if (value == null) return;
-                              setState(() => _selectedSort = value);
-                              AnalyticsService().track('sort_changed', props: {'sort': value});
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
-                          ),
-                          FilterChip(
-                            label: const Text('Under ₹499'),
-                            selected: _maxPriceFilter == 499,
-                            onSelected: (selected) {
-                              setState(() => _maxPriceFilter = selected ? 499 : null);
-                              AnalyticsService().track('filter_applied', props: {'filter': 'max_price_499', 'selected': selected});
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
-                          ),
-                          FilterChip(
-                            label: const Text('30%+ Off'),
-                            selected: _minDiscountFilter == 30,
-                            onSelected: (selected) {
-                              setState(() => _minDiscountFilter = selected ? 30 : 0);
-                              AnalyticsService().track('filter_applied', props: {'filter': 'discount_30_plus', 'selected': selected});
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
-                          ),
-                          FilterChip(
-                            label: const Text('ETA < 30m'),
-                            selected: _etaUnder30Filter,
-                            onSelected: (selected) {
-                              setState(() => _etaUnder30Filter = selected);
-                              AnalyticsService().track('filter_applied', props: {'filter': 'eta_under_30', 'selected': selected});
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
-                          ),
-                          ActionChip(
-                            label: const Text('Clear Filters'),
-                            onPressed: () {
-                              setState(() {
-                                _maxPriceFilter = null;
-                                _minDiscountFilter = 0;
-                                _etaUnder30Filter = false;
-                                _selectedSort = 'trending';
-                              });
-                              _page = 1;
-                              _loadBrowseProducts();
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 8),
+                    if (_recentProducts.isNotEmpty) ...[
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: Text('Recently Viewed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ),
+                      SizedBox(
+                        height: 120,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          itemCount: _recentProducts.length,
+                          itemBuilder: (context, index) {
+                            final rp = _recentProducts[index];
+                            return GestureDetector(
+                              onTap: () => Navigator.pushNamed(context, '/product', arguments: rp['id']),
+                              child: Container(
+                                width: 110,
+                                margin: const EdgeInsets.only(right: 10),
+                                child: Column(children: [
+                                  Expanded(child: Container(color: Colors.grey.shade200, child: rp['image'] != null ? Image.network(rp['image'], fit: BoxFit.cover) : const Icon(Icons.checkroom))),
+                                  Text(rp['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                                ]),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                    _SectionRow(title: 'Personalized for you', products: _becauseYouViewed()),
                     ..._tagRowsForGender().map((row) => _SectionRow(
                           title: row['title'] as String,
                           products: _sectionProducts((row['keywords'] as List).map((e) => e.toString()).toList()),
@@ -843,34 +826,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                    if (_recentProducts.isNotEmpty) ...[
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Text('Recently Viewed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      ),
-                      SizedBox(
-                        height: 120,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: _recentProducts.length,
-                          itemBuilder: (context, index) {
-                            final rp = _recentProducts[index];
-                            return GestureDetector(
-                              onTap: () => Navigator.pushNamed(context, '/product', arguments: rp['id']),
-                              child: Container(
-                                width: 110,
-                                margin: const EdgeInsets.only(right: 10),
-                                child: Column(children: [
-                                  Expanded(child: Container(color: Colors.grey.shade200, child: rp['image'] != null ? Image.network(rp['image'], fit: BoxFit.cover) : const Icon(Icons.checkroom))),
-                                  Text(rp['name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
-                                ]),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
                     const Padding(
                       padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
                       child: Text('Featured', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -993,6 +948,13 @@ class _SectionRow extends StatelessWidget {
   const _SectionRow({required this.title, required this.products});
 
   @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (products.isEmpty) return const SizedBox.shrink();
     return Column(
@@ -1021,6 +983,13 @@ class _CategoryTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   const _CategoryTile({required this.category, required this.selected, required this.onTap});
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1056,6 +1025,13 @@ class _CategoryTile extends StatelessWidget {
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductCard({required this.product});
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1115,6 +1091,13 @@ class _ProductCard extends StatelessWidget {
 class _ProductGridItem extends StatelessWidget {
   final Map<String, dynamic> product;
   const _ProductGridItem({required this.product});
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
