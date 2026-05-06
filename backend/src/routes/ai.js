@@ -20,7 +20,7 @@ router.post('/analyze-product', upload.array('images', 10), async (req, res) => 
       return res.status(400).json({ success: false, message: 'At least one image is required' });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const imageParts = files.map((file) => ({
       inlineData: {
@@ -94,7 +94,7 @@ router.post('/create-product', authenticate, authorize('shop_admin', 'admin'), u
     if (!shopId) return res.status(400).json({ success: false, message: 'No shop assigned' });
 
     // 1. Analyze with Gemini
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const imageParts = files.map(f => ({ inlineData: { data: f.buffer.toString('base64'), mimeType: f.mimetype } }));
 
     const systemPrompt = `You are a product listing assistant for Feriwala, a quick-commerce clothing platform.
