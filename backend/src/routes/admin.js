@@ -18,6 +18,80 @@ const crypto = require('crypto');
 // All admin routes require admin role
 router.use(authenticate, authorize('admin'));
 
+// ─── REGISTRATIONS (pending approvals) ──────────────────────────────────────
+
+router.get('/registrations', async (req, res) => {
+  try {
+    const { status = 'pending', role } = req.query;
+    const filter = { approvalStatus: status };
+    if (role) filter.role = role;
+    else filter.role = { $in: ['shop_admin', 'delivery_agent'] };
+    const users = await User.find(filter).sort({ createdAt: -1 });
+    res.json({ success: true, data: users });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
+router.put('/registrations/:id/approve', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (user.approvalStatus !== 'pending') return res.status(400).json({ success: false, message: 'Not a pending registration' });
+
+    user.approvalStatus = 'approved';
+    user.isActive = true;
+    user.isVerified = true;
+
+    // If shop_admin: create the Shop record from registrationData
+    if (user.role === 'shop_admin' && user.registrationData) {
+      const rd = user.registrationData;
+      const code = rd.shopName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12) + '_' + user._id.toString().slice(-4).toUpperCase();
+      const shop = await Shop.create({
+        name: rd.shopName,
+        code,
+        addressLine1: rd.shopAddress,
+        city: rd.city,
+        state: rd.state,
+        pincode: rd.pincode,
+        phone: user.phone,
+        email: user.email,
+        latitude: 0,   // will be seeded by shop owner from GPS
+        longitude: 0,
+        openingTime: rd.openingTime || '09:00:00',
+        closingTime: rd.closingTime || '21:00:00',
+        isActive: false, // active only after location is seeded
+      });
+      user.shopId = shop.id;
+    }
+
+    await user.save();
+    res.json({ success: true, message: 'Registration approved', data: user });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
+router.put('/registrations/:id/reject', [
+  body('reason').trim().notEmpty().withMessage('Rejection reason is required'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.approvalStatus = 'rejected';
+    user.rejectionReason = req.body.reason;
+    user.isActive = false;
+    await user.save();
+    res.json({ success: true, message: 'Registration rejected' });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
 
 router.get('/dashboard', async (req, res) => {

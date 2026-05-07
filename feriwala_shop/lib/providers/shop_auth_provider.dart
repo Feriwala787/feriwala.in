@@ -9,12 +9,27 @@ class ShopAuthProvider extends ChangeNotifier {
   int? _shopId;
   bool _isLoading = false;
   bool _isAuthenticated = false;
+  bool _shopLocationNeeded = false;
   final PushNotificationService _pushService = PushNotificationService();
 
   Map<String, dynamic>? get user => _user;
   int? get shopId => _shopId;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _isAuthenticated;
+  bool get shopLocationNeeded => _shopLocationNeeded;
+
+  Future<void> _checkShopLocation() async {
+    if (_shopId == null) return;
+    try {
+      final res = await _api.get('/shops/my/shop');
+      final shop = res['data'];
+      final lat = double.tryParse(shop['latitude']?.toString() ?? '0') ?? 0;
+      final lng = double.tryParse(shop['longitude']?.toString() ?? '0') ?? 0;
+      _shopLocationNeeded = (lat == 0 && lng == 0);
+    } catch (_) {
+      _shopLocationNeeded = false;
+    }
+  }
 
   Future<void> init() async {
     await _api.init();
@@ -29,6 +44,7 @@ class ShopAuthProvider extends ChangeNotifier {
           _isAuthenticated = true;
           if (_shopId != null) {
             _pushService.initForShopUser(shopId: _shopId!, role: _user?['role'] ?? 'shop_admin');
+            await _checkShopLocation();
           }
         } else {
           await _api.clearToken();
@@ -54,6 +70,7 @@ class ShopAuthProvider extends ChangeNotifier {
       _isAuthenticated = true;
       if (_shopId != null) {
         _pushService.initForShopUser(shopId: _shopId!, role: _user?['role'] ?? 'shop_admin');
+        await _checkShopLocation();
       }
     } finally {
       _isLoading = false;
@@ -66,6 +83,7 @@ class ShopAuthProvider extends ChangeNotifier {
     _user = null;
     _shopId = null;
     _isAuthenticated = false;
+    _shopLocationNeeded = false;
     notifyListeners();
   }
 }

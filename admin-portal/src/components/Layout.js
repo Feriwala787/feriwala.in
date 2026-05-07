@@ -7,6 +7,7 @@ const adminNav = [
   { path: '/finance', label: 'Finance', icon: '💰' },
   { path: '/shops', label: 'Shops', icon: '🏪' },
   { path: '/users', label: 'Users', icon: '👥' },
+  { path: '/registrations', label: 'Registrations', icon: '📋' },
   { path: '/orders', label: 'Orders', icon: '📦' },
   { path: '/categories', label: 'Categories', icon: '📂' },
 ];

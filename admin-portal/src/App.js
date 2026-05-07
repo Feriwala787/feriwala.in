@@ -14,6 +14,8 @@ import Orders from './pages/Orders';
 import ShopProducts from './pages/ShopProducts';
 import ShopOpsNotice from './pages/ShopOpsNotice';
 
+import Registrations from './pages/Registrations';
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return (
@@ -40,6 +42,7 @@ function AppRoutes() {
         <Route path="shops/new" element={<ShopForm />} />
         <Route path="shops/:id/edit" element={<ShopForm />} />
         <Route path="users" element={<Users />} />
+        <Route path="registrations" element={<Registrations />} />
         <Route path="categories" element={<Categories />} />
         <Route path="orders" element={<Orders />} />
         <Route path="operations" element={<ShopOpsNotice />} />

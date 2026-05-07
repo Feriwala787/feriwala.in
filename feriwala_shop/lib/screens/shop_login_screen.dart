@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
+import 'shop_register_screen.dart';
+import 'shop_seed_location_screen.dart';
 
 class ShopLoginScreen extends StatefulWidget {
   const ShopLoginScreen({super.key});
@@ -13,6 +15,7 @@ class _ShopLoginScreenState extends State<ShopLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _obscure = true;
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -21,7 +24,15 @@ class _ShopLoginScreenState extends State<ShopLoginScreen> {
             _emailController.text.trim(),
             _passwordController.text,
           );
-      if (mounted) Navigator.pushReplacementNamed(context, '/dashboard');
+      if (!mounted) return;
+      final auth = context.read<ShopAuthProvider>();
+      // If shop has no location set (lat/lng = 0), go to seed location screen
+      final needsLocation = auth.shopLocationNeeded;
+      if (needsLocation) {
+        Navigator.pushReplacementNamed(context, '/seed-location');
+      } else {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -69,12 +80,13 @@ class _ShopLoginScreenState extends State<ShopLoginScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _obscure,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: 'Password',
                       labelStyle: const TextStyle(color: Colors.white54),
                       prefixIcon: const Icon(Icons.lock, color: Colors.white54),
+                      suffixIcon: IconButton(icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: Colors.white54), onPressed: () => setState(() => _obscure = !_obscure)),
                       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white24)),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFF47721))),
                     ),
@@ -96,6 +108,14 @@ class _ShopLoginScreenState extends State<ShopLoginScreen> {
                           : const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Text('New shop owner?', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                    TextButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShopRegisterScreen())),
+                      child: const Text('Register Here', style: TextStyle(color: Color(0xFFF47721), fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ]),
                 ],
               ),
             ),

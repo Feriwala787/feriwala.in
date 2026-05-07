@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/delivery_auth_provider.dart';
+import 'delivery_register_screen.dart';
 
 class DeliveryLoginScreen extends StatefulWidget {
   const DeliveryLoginScreen({super.key});
@@ -96,6 +97,14 @@ class _DeliveryLoginScreenState extends State<DeliveryLoginScreen> {
                           : const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Text('New delivery agent?', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                    TextButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeliveryRegisterScreen())),
+                      child: const Text('Register Here', style: TextStyle(color: Color(0xFFF47721), fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ]),
                 ],
               ),
             ),

@@ -32,6 +32,9 @@ const userSchema = new mongoose.Schema({
   refreshToken: { type: String, default: null },
   passwordResetOtp: { type: String, default: null },
   passwordResetOtpExpiry: { type: Date, default: null },
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
+  rejectionReason: { type: String, default: null },
+  registrationData: { type: mongoose.Schema.Types.Mixed, default: null }, // stores shop/delivery reg details
 }, {
   timestamps: true,
 });
