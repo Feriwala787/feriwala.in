@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -116,6 +117,19 @@ class ShopApiService {
           headers: _headers,
           body: jsonEncode(body),
         ));
+  }
+
+  Future<Map<String, dynamic>> uploadFiles(String endpoint, {required List<File> files, Map<String, String>? fields}) async {
+    final uri = Uri.parse('$baseUrl$endpoint');
+    final request = http.MultipartRequest('POST', uri);
+    if (_token != null) request.headers['Authorization'] = 'Bearer $_token';
+    fields?.forEach((k, v) => request.fields[k] = v);
+    for (int i = 0; i < files.length; i++) {
+      request.files.add(await http.MultipartFile.fromPath('images', files[i].path));
+    }
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    return _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> delete(String endpoint) async {

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/shop_auth_provider.dart';
 import 'shop_register_screen.dart';
-import 'shop_seed_location_screen.dart';
 
 class ShopLoginScreen extends StatefulWidget {
   const ShopLoginScreen({super.key});
