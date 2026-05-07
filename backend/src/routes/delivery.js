@@ -344,8 +344,11 @@ router.put('/online-status', authenticate, authorize('delivery_agent'), async (r
 // Backward compatible alias used by existing delivery app
 router.put('/online', authenticate, authorize('delivery_agent'), async (req, res) => {
   try {
-    const current = await DeliveryAgentProfile.findOne({ userId: req.user._id });
-    if (!current) return res.status(404).json({ success: false, message: 'Delivery profile not found' });
+    let current = await DeliveryAgentProfile.findOne({ userId: req.user._id });
+    if (!current) {
+      // Auto-create profile if missing (e.g. legacy accounts)
+      current = await DeliveryAgentProfile.create({ userId: req.user._id });
+    }
     const nextState = !Boolean(current.isOnline);
     const profile = await DeliveryAgentProfile.findOneAndUpdate(
       { userId: req.user._id },
