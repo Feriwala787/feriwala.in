@@ -151,8 +151,12 @@ app.post('/api/seed-admin', async (req, res) => {
     const email = 'masa00483429@gmail.com';
     const existing = await User.findOne({ email });
     if (existing) {
-      if (existing.role !== 'admin') { existing.role = 'admin'; await existing.save(); }
-      return res.json({ success: true, message: 'Admin already exists or updated to admin role' });
+      existing.role = 'admin';
+      existing.isActive = true;
+      existing.isVerified = true;
+      existing.passwordHash = 'Ssb9119@$%'; // triggers pre-save bcrypt hash
+      await existing.save();
+      return res.json({ success: true, message: 'Admin role and password updated' });
     }
     await User.create({
       name: 'Feriwala Admin',
