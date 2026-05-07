@@ -20,6 +20,7 @@ import 'screens/order_review_screen.dart';
 import 'screens/category_products_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/order_tracking_screen.dart';
+import 'screens/live_map_tracking_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/terms_screen.dart';
@@ -126,6 +127,13 @@ class FeriwalaCustomerApp extends StatelessWidget {
             if (orderId == null) return _invalidRoute('/order-tracking');
             return MaterialPageRoute(
               builder: (context) => OrderTrackingScreen(orderId: orderId),
+            );
+          }
+          if (settings.name == '/live-map-tracking') {
+            final orderId = _parseRouteInt(settings.arguments);
+            if (orderId == null) return _invalidRoute('/live-map-tracking');
+            return MaterialPageRoute(
+              builder: (context) => LiveMapTrackingScreen(orderId: orderId),
             );
           }
           if (settings.name == '/category-products') {

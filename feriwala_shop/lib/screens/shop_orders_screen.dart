@@ -264,7 +264,7 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _sortBy,
+                        initialValue: _sortBy,
                         decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Sort'),
                         items: const [
                           DropdownMenuItem(value: 'latest', child: Text('Latest')),
@@ -277,7 +277,7 @@ class _ShopOrdersScreenState extends State<ShopOrdersScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _paymentFilter,
+                        initialValue: _paymentFilter,
                         decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Payment'),
                         items: const [
                           DropdownMenuItem(value: 'all', child: Text('All')),

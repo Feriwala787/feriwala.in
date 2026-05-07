@@ -22,6 +22,7 @@ const promoRoutes = require('./routes/promos');
 const adminRoutes = require('./routes/admin');
 const customerRoutes = require('./routes/customers');
 const aiRoutes = require('./routes/ai');
+const locationRoutes = require('./routes/location');
 
 // ─── DB status (declared before any route handler references it) ──────────────
 const dbStatus = {
@@ -138,6 +139,7 @@ app.use('/api/promos', promoRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/location', locationRoutes);
 
 // ─── Legal pages (required for Play Store / App Store) ────────────────────────
 app.get('/privacy', (req, res) => {

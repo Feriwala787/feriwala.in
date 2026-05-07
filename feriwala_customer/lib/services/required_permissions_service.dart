@@ -3,6 +3,11 @@ import 'package:permission_handler/permission_handler.dart';
 
 class RequiredPermissionsService {
   Future<void> requestStartupPermissions() async {
+    if (kIsWeb) {
+      debugPrint('[Permissions] Skipping native permissions on web');
+      return;
+    }
+    
     await _requestPermission(
       Permission.locationWhenInUse,
       feature: 'live order tracking and nearby shop discovery',

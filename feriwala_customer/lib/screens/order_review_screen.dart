@@ -94,14 +94,26 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
       return;
     }
 
+    if (cart.shopId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Shop not selected'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     // Validate serviceability (non-blocking — warn only)
     try {
       await ApiService().post('/orders/serviceability', body: {
         'shopId': cart.shopId,
         'deliveryAddress': widget.address,
       });
-    } catch (_) {
-      // serviceability check failed — proceed anyway, backend will validate
+    } catch (e) {
+      // serviceability check failed — show warning but proceed
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Serviceability check: ${mapApiError(e)}'), backgroundColor: Colors.orange),
+        );
+      }
     }
 
     final isValidCart = await _validateCartBeforeOrder();
@@ -114,30 +126,52 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
     setState(() => _placing = true);
     
     try {
+      final orderPayload = {
+        'clientOrderId': _clientOrderId,
+        'shopId': cart.shopId,
+        'items': cart.items.map((i) => i.toOrderItem()).toList(),
+        'deliveryAddress': widget.address,
+        'paymentMethod': widget.paymentMethod,
+        if (cart.promoCode != null) 'promoCode': cart.promoCode,
+      };
+
+      debugPrint('Placing order with payload: $orderPayload');
+
       final res = await ApiService().post(
         '/orders',
         headers: {'Idempotency-Key': _clientOrderId},
-        body: {
-          'clientOrderId': _clientOrderId,
-          'shopId': cart.shopId,
-          'items': cart.items.map((i) => i.toOrderItem()).toList(),
-          'deliveryAddress': widget.address,
-          'paymentMethod': widget.paymentMethod,
-          if (cart.promoCode != null) 'promoCode': cart.promoCode,
-        },
+        body: orderPayload,
       );
+
+      debugPrint('Order response: $res');
 
       AnalyticsService().track('place_order_success');
       cart.clearCart();
       
       if (!mounted) return;
+      
+      final orderId = res['data']?['id'];
+      if (orderId == null) {
+        throw Exception('Order ID not returned from server');
+      }
+
       Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
-      Navigator.pushNamed(context, '/order-tracking', arguments: res['data']['id']);
+      Navigator.pushNamed(context, '/order-tracking', arguments: orderId);
     } catch (e) {
+      debugPrint('Order placement error: $e');
       if (mounted) {
-        AnalyticsService().track('place_order_failed');
+        AnalyticsService().track('place_order_failed', props: {'error': e.toString()});
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(mapApiError(e)), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed to place order: ${mapApiError(e)}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _placeOrder,
+            ),
+          ),
         );
       }
     } finally {

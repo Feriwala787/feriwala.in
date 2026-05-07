@@ -105,7 +105,7 @@ class ShopReceiptScreen extends StatelessWidget {
 
   Future<void> _recordPrintEvent({required String status}) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = 'shop_receipt_print_history';
+    const key = 'shop_receipt_print_history';
     final raw = prefs.getStringList(key) ?? [];
     raw.insert(
       0,

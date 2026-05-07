@@ -260,7 +260,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
                   await auth.toggleOnline();
                   _pushLocationIfOnline();
                 },
-                activeColor: Colors.green,
+                activeThumbColor: Colors.green,
               ),
               if (_queuedActionCount > 0)
                 QueuedActionBadge(count: _queuedActionCount),
@@ -372,7 +372,7 @@ class TaskCard extends StatelessWidget {
   final VoidCallback? onAccept;
   final VoidCallback? onNavigate;
   final bool isAccepting;
-  const TaskCard({required this.task, required this.onTap, this.onAccept, this.onNavigate, this.isAccepting = false});
+  const TaskCard({super.key, required this.task, required this.onTap, this.onAccept, this.onNavigate, this.isAccepting = false});
 
   @override
   Widget build(BuildContext context) {
@@ -538,7 +538,7 @@ class QueuedActionBadge extends StatelessWidget {
 class DeliveryErrorState extends StatelessWidget {
   final String message;
   final Future<void> Function() onRetry;
-  const DeliveryErrorState({required this.message, required this.onRetry});
+  const DeliveryErrorState({super.key, required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {

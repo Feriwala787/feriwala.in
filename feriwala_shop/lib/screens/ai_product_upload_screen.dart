@@ -41,7 +41,9 @@ class _AiProductUploadScreenState extends State<AiProductUploadScreen> {
 
   @override
   void dispose() {
-    for (final c in [_promptCtrl, _nameCtrl, _brandCtrl, _descCtrl, _mrpCtrl, _priceCtrl]) c.dispose();
+    for (final c in [_promptCtrl, _nameCtrl, _brandCtrl, _descCtrl, _mrpCtrl, _priceCtrl]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -440,7 +442,7 @@ class _AiProductUploadScreenState extends State<AiProductUploadScreen> {
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
         child: DropdownButtonFormField<String>(
-          value: _sizes.contains(v.size) ? v.size : 'M',
+          initialValue: _sizes.contains(v.size) ? v.size : 'M',
           isDense: true,
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),

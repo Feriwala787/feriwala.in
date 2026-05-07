@@ -437,7 +437,7 @@ class _AddAddressScreenState extends State<_AddAddressScreen> {
               contentPadding: EdgeInsets.zero,
               value: _isDefault,
               onChanged: (v) => setState(() => _isDefault = v),
-              activeColor: _kOrange,
+              activeThumbColor: _kOrange,
               title: const Text('Set as default', style: TextStyle(fontSize: 13)),
             ),
             const SizedBox(height: 20),

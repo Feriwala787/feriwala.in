@@ -19,7 +19,7 @@ class ShopSocketService {
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('shop_access_token');
-    final socketBaseUrl = 'https://api.feriwala.in';
+    const socketBaseUrl = 'https://api.feriwala.in';
 
     _socket = io.io(
       socketBaseUrl,
