@@ -94,19 +94,14 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
       return;
     }
 
-    // Validate serviceability
+    // Validate serviceability (non-blocking — warn only)
     try {
       await ApiService().post('/orders/serviceability', body: {
         'shopId': cart.shopId,
         'deliveryAddress': widget.address,
       });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(mapApiError(e)), backgroundColor: Colors.orange),
-        );
-      }
-      return;
+    } catch (_) {
+      // serviceability check failed — proceed anyway, backend will validate
     }
 
     final isValidCart = await _validateCartBeforeOrder();
@@ -153,11 +148,15 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
-    final deliveryFee = (_quote?['deliveryFee'] as num?)?.toDouble() ?? 30.0;
-    final tax = (_quote?['tax'] as num?)?.toDouble() ?? (cart.subtotal * 0.05);
-    final discount = (_quote?['discount'] as num?)?.toDouble() ?? cart.discount;
     final subtotal = (_quote?['subtotal'] as num?)?.toDouble() ?? cart.subtotal;
-    final grandTotal = (_quote?['total'] as num?)?.toDouble() ?? (subtotal - discount + deliveryFee + tax);
+    final discount = (_quote?['discount'] as num?)?.toDouble() ?? cart.discount;
+    // ₹20 delivery for orders under ₹299, else free
+    final deliveryFee = (_quote?['deliveryFee'] as num?)?.toDouble()
+        ?? ((subtotal - discount) < 299 ? 20.0 : 0.0);
+    final tax = (_quote?['tax'] as num?)?.toDouble() ?? 0.0;
+    final grandTotal = (_quote?['total'] as num?)?.toDouble()
+        ?? (subtotal - discount + deliveryFee + tax);
+    final isFreeDelivery = deliveryFee == 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F8),
@@ -281,8 +280,12 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
                         children: [
                           _PriceRow('Subtotal', subtotal),
                           if (discount > 0) _PriceRow('Discount', -discount, color: Colors.green),
-                          _PriceRow('Delivery', deliveryFee),
-                          _PriceRow('Tax', tax),
+                          _PriceRow(
+                            isFreeDelivery ? 'Delivery (FREE above ₹299)' : 'Delivery',
+                            deliveryFee,
+                            color: isFreeDelivery ? Colors.green : null,
+                          ),
+                          if (tax > 0) _PriceRow('Tax', tax),
                           Divider(height: 16, color: Colors.grey.shade300),
                           _PriceRow('Total', grandTotal, isBold: true, fontSize: 16),
                         ],
@@ -296,15 +299,31 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Row(
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue, size: 18),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '⏱️ Delivery: 25-45 mins\n❌ Cancel before pickup',
-                            style: TextStyle(fontSize: 11, color: Colors.blue),
-                          ),
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                            SizedBox(width: 6),
+                            Text('⏱️ Delivery in 25-45 mins', style: TextStyle(fontSize: 11, color: Colors.blue)),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.cancel_outlined, color: Colors.orange, size: 16),
+                            SizedBox(width: 6),
+                            Text('₹20 cancellation charge if cancelled after placing', style: TextStyle(fontSize: 11, color: Colors.orange)),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.local_shipping_outlined, color: Colors.green, size: 16),
+                            SizedBox(width: 6),
+                            Text('Free delivery on orders above ₹299', style: TextStyle(fontSize: 11, color: Colors.green)),
+                          ],
                         ),
                       ],
                     ),

@@ -17,6 +17,7 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _goToHome() async {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
+    // Stay logged in — always go home; auth state is restored by AuthProvider
     Navigator.pushReplacementNamed(context, '/home');
   }
 

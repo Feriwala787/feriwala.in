@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/error_reporter.dart';
+import 'dart:async';
 
 class OrderTrackingScreen extends StatefulWidget {
   final int orderId;
@@ -16,8 +18,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   Map<String, dynamic>? _order;
   List<dynamic> _returnRequests = [];
   Map<String, dynamic>? _deliveryStatus;
+  Position? _userPosition;
   bool _loading = true;
   final _socketService = SocketService();
+  Timer? _locationRefreshTimer;
 
   final _statusSteps = [
     'pending', 'confirmed', 'preparing', 'ready_for_pickup',
@@ -29,6 +33,29 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     super.initState();
     _loadOrder();
     _listenToUpdates();
+    _getUserLocation();
+    _startLocationRefresh();
+  }
+
+  @override
+  void dispose() {
+    _locationRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startLocationRefresh() {
+    _locationRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (_order?['status'] == 'out_for_delivery' || _order?['status'] == 'picked_up') {
+        _loadOrder();
+      }
+    });
+  }
+
+  Future<void> _getUserLocation() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+      if (mounted) setState(() => _userPosition = pos);
+    } catch (_) {}
   }
 
   void _listenToUpdates() {
@@ -68,6 +95,29 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     return index >= 0 ? index : 0;
   }
 
+  double? _distanceToAgent() {
+    if (_userPosition == null || _deliveryStatus?['agent'] == null) return null;
+    final agentLat = _deliveryStatus!['agent']['latitude'] as double?;
+    final agentLng = _deliveryStatus!['agent']['longitude'] as double?;
+    if (agentLat == null || agentLng == null) return null;
+    return Geolocator.distanceBetween(
+      _userPosition!.latitude,
+      _userPosition!.longitude,
+      agentLat,
+      agentLng,
+    ) / 1000;
+  }
+
+  double? _distanceFromWarehouse() {
+    if (_deliveryStatus?['agent'] == null || _order?['shop'] == null) return null;
+    final agentLat = _deliveryStatus!['agent']['latitude'] as double?;
+    final agentLng = _deliveryStatus!['agent']['longitude'] as double?;
+    final shopLat = double.tryParse((_order!['shop']['latitude'] ?? '').toString());
+    final shopLng = double.tryParse((_order!['shop']['longitude'] ?? '').toString());
+    if (agentLat == null || agentLng == null || shopLat == null || shopLng == null) return null;
+    return Geolocator.distanceBetween(shopLat, shopLng, agentLat, agentLng) / 1000;
+  }
+
   Future<void> _cancelOrder() async {
     if (_order == null) return;
     final reasonController = TextEditingController();
@@ -79,7 +129,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('You can cancel only before dispatch.'),
+            const Text('₹20 cancellation charge will apply.'),
             const SizedBox(height: 8),
             TextField(
               controller: reasonController,
@@ -110,7 +160,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order cancelled successfully')),
+        const SnackBar(content: Text('Order cancelled. ₹20 charge applied.')),
       );
       _loadOrder();
     } catch (e) {
@@ -262,8 +312,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     }
   }
 
-
-
   String _labelForStatus(String status) {
     switch (status) {
       case 'pending': return 'Order Received';
@@ -295,6 +343,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       return 'Updated ${mins}m ago';
     }
 
+    final distToAgent = _distanceToAgent();
+    final distFromWarehouse = _distanceFromWarehouse();
+    final isOutForDelivery = _order?['status'] == 'out_for_delivery' || _order?['status'] == 'picked_up';
+
     return Scaffold(
       appBar: AppBar(title: Text(_order?['orderNumber'] ?? 'Order Details')),
       body: _loading
@@ -306,6 +358,78 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Live tracking card (if out for delivery)
+                      if (isOutForDelivery && _deliveryStatus?['agent'] != null)
+                        Card(
+                          color: const Color(0xFFF47721).withAlpha(20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.green,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('Live Tracking', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.delivery_dining, color: Color(0xFFF47721), size: 28),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _deliveryStatus!['agent']['name'] ?? 'Delivery Agent',
+                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                          ),
+                                          if (distToAgent != null)
+                                            Text(
+                                              '${distToAgent.toStringAsFixed(1)} km away from you',
+                                              style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
+                                            ),
+                                          if (distFromWarehouse != null)
+                                            Text(
+                                              '${distFromWarehouse.toStringAsFixed(1)} km from store',
+                                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                            ),
+                                          Text(
+                                            freshnessText(_deliveryStatus!['agent']['locationUpdatedAt']),
+                                            style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () async {
+                                        final phone = _deliveryStatus!['agent']['phone'];
+                                        if (phone != null) {
+                                          final uri = Uri.parse('tel:$phone');
+                                          if (await canLaunchUrl(uri)) await launchUrl(uri);
+                                        }
+                                      },
+                                      icon: const Icon(Icons.call, color: Color(0xFFF47721)),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (isOutForDelivery && _deliveryStatus?['agent'] != null) const SizedBox(height: 12),
+
                       // Status stepper
                       Card(
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -365,28 +489,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Need help?', style: TextStyle(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                children: [
-                                  OutlinedButton.icon(onPressed: _contactSupport, icon: const Icon(Icons.call), label: const Text('Call Support')),
-                                  OutlinedButton.icon(onPressed: _cancelOrder, icon: const Icon(Icons.cancel_outlined), label: const Text('Cancel if eligible')),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              const Text('Return eligibility: within 7 days of delivery for eligible items.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
 
                       // Order items
                       Card(
@@ -404,7 +506,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Expanded(child: Text('${item['productName']} x${item['quantity']}')),
-                                        Text('INR ${item['total']}'),
+                                        Text('₹${item['total']}'),
                                       ],
                                     ),
                                   )),
@@ -413,7 +515,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  Text('INR ${_order!['total']}',
+                                  Text('₹${_order!['total']}',
                                       style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF47721))),
                                 ],
                               ),
@@ -423,31 +525,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      if (_deliveryStatus?['agent'] != null)
-                        Card(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Assigned Delivery Partner', style: TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 8),
-                                Text(_deliveryStatus!['agent']['name'] ?? 'Delivery Agent'),
-                                Text(_deliveryStatus!['agent']['phone'] ?? '', style: const TextStyle(color: Colors.grey)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  freshnessText(_deliveryStatus!['agent']['locationUpdatedAt']),
-                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                      if (_deliveryStatus?['agent'] != null) const SizedBox(height: 12),
-
-                      if (_returnRequests.isNotEmpty) ...[
+                      if (_returnRequests.isNotEmpty) ...[ 
                         Card(
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           child: Padding(
@@ -485,14 +563,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                           child: OutlinedButton(
                             onPressed: _cancelOrder,
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                            child: const Text('Cancel Order'),
+                            child: const Text('Cancel Order (₹20 charge)'),
                           ),
                         ),
 
-                      if (_order!['status'] == 'pending' || _order!['status'] == 'confirmed')
-                        const SizedBox(height: 12),
-
-                      // Request return (if delivered)
                       if (_order!['status'] == 'delivered')
                         SizedBox(
                           width: double.infinity,
@@ -502,38 +576,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                             child: const Text('Request Return / Replace'),
                           ),
                         ),
-
-                      if (_returnRequests.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Card(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Return Requests', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 8),
-                                ..._returnRequests.map((r) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '#${r['id']} - ${(r['returnType'] ?? 'return').toString().toUpperCase()} - ${(r['status'] ?? '').toString().replaceAll('_', ' ').toUpperCase()}',
-                                            style: const TextStyle(fontWeight: FontWeight.w600),
-                                          ),
-                                          Text(r['reason'] ?? '', style: const TextStyle(color: Colors.grey)),
-                                          if ((r['refundStatus'] ?? '').toString().isNotEmpty)
-                                            Text('Refund: ${r['refundStatus']}', style: const TextStyle(color: Colors.green)),
-                                        ],
-                                      ),
-                                    )),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),

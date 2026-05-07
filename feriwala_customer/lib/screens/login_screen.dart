@@ -29,7 +29,16 @@ class _LoginScreenState extends State<LoginScreen> {
             _emailController.text.trim(),
             _passwordController.text,
           );
-      if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      if (!mounted) return;
+      // Return to wherever the user came from, or home
+      final returnRoute = ModalRoute.of(context)?.settings.arguments as String?;
+      if (returnRoute != null) {
+        Navigator.pushReplacementNamed(context, returnRoute);
+      } else if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
