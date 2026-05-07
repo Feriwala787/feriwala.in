@@ -7,6 +7,8 @@ const { authenticate } = require('../middleware/auth');
 const { routeError } = require('../utils/routeError');
 const { isMongoReady } = require('../database/mongodb');
 const jwt = require('jsonwebtoken');
+const { sendOtpEmail } = require('../services/emailService');
+const crypto = require('crypto');
 
 function requireMongoReady(req, res, next) {
   if (!isMongoReady()) {
@@ -201,6 +203,69 @@ router.post('/logout', authenticate, async (req, res) => {
     req.user.fcmToken = null;
     await req.user.save();
     res.json({ success: true, message: 'Logged out' });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
+// Forgot Password — send OTP
+router.post('/forgot-password', [
+  body('email').isEmail().normalizeEmail(),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    // Always return success to prevent email enumeration
+    if (!user) return res.json({ success: true, message: 'If that email exists, an OTP has been sent.' });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    user.passwordResetOtp = otpHash;
+    user.passwordResetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+    await user.save();
+
+    await sendOtpEmail({ to: email, otp, name: user.name });
+    res.json({ success: true, message: 'If that email exists, an OTP has been sent.' });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
+// Reset Password — verify OTP and set new password
+router.post('/reset-password', [
+  body('email').isEmail().normalizeEmail(),
+  body('otp').isLength({ min: 6, max: 6 }),
+  body('newPassword').isLength({ min: 6 }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+    const { email, otp, newPassword } = req.body;
+    const user = await User.findOne({ email });
+    if (!user || !user.passwordResetOtp || !user.passwordResetOtpExpiry) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    }
+
+    if (user.passwordResetOtpExpiry < new Date()) {
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new one.' });
+    }
+
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    if (otpHash !== user.passwordResetOtp) {
+      return res.status(400).json({ success: false, message: 'Incorrect OTP' });
+    }
+
+    user.passwordHash = newPassword;
+    user.passwordResetOtp = null;
+    user.passwordResetOtpExpiry = null;
+    user.refreshToken = null; // Invalidate all sessions
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully. Please login.' });
   } catch (error) {
     routeError(res, error);
   }

@@ -30,6 +30,8 @@ const userSchema = new mongoose.Schema({
   fcmToken: { type: String, default: null },
   lastLogin: { type: Date },
   refreshToken: { type: String, default: null },
+  passwordResetOtp: { type: String, default: null },
+  passwordResetOtpExpiry: { type: Date, default: null },
 }, {
   timestamps: true,
 });
@@ -54,6 +56,8 @@ userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.passwordHash;
   delete obj.refreshToken;
+  delete obj.passwordResetOtp;
+  delete obj.passwordResetOtpExpiry;
   return obj;
 };
 

@@ -141,6 +141,35 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/location', locationRoutes);
 
+// One-time admin seed (protected by secret key)
+app.post('/api/seed-admin', async (req, res) => {
+  try {
+    if (req.body.secret !== (process.env.SEED_SECRET || 'feriwala-seed-2025')) {
+      return res.status(403).json({ success: false, message: 'Invalid secret' });
+    }
+    const User = require('./models/mongo/User');
+    const email = 'masa00483429@gmail.com';
+    const existing = await User.findOne({ email });
+    if (existing) {
+      if (existing.role !== 'admin') { existing.role = 'admin'; await existing.save(); }
+      return res.json({ success: true, message: 'Admin already exists or updated to admin role' });
+    }
+    await User.create({
+      name: 'Feriwala Admin',
+      loginId: 'feriwala_admin',
+      email,
+      phone: '9000000001',
+      passwordHash: 'Ssb9119@$%',
+      role: 'admin',
+      isVerified: true,
+      isActive: true,
+    });
+    res.json({ success: true, message: 'Admin seeded successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ─── Legal pages (required for Play Store / App Store) ────────────────────────
 app.get('/privacy', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Privacy Policy - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}</style></head><body>
