@@ -23,7 +23,7 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
   bool _placing = false;
   Map<String, dynamic>? _quote;
   bool _quoteLoading = true;
-  String _clientOrderId = DateTime.now().millisecondsSinceEpoch.toString();
+  final String _clientOrderId = DateTime.now().millisecondsSinceEpoch.toString();
 
   @override
   void initState() {
@@ -160,122 +160,150 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
     final grandTotal = (_quote?['total'] as num?)?.toDouble() ?? (subtotal - discount + deliveryFee + tax);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Review Order')),
+      backgroundColor: const Color(0xFFF8F8F8),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text('Review Order', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        centerTitle: true,
+      ),
       body: _quoteLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Items
-                  const Text('Order Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  ...cart.items.map((item) => Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: item.image != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(item.image!, width: 50, height: 50, fit: BoxFit.cover),
-                                )
-                              : Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(Icons.checkroom, color: Colors.grey),
-                                ),
-                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                          subtitle: Text('Qty: ${item.quantity} • ₹${item.price.toStringAsFixed(2)}'),
-                          trailing: Text('₹${item.total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      )),
-                  const SizedBox(height: 24),
+                  const Text('Items', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Card(
+                    elevation: 1,
+                    child: Column(
+                      children: cart.items.asMap().entries.map((entry) {
+                        final item = entry.value;
+                        final isLast = entry.key == cart.items.length - 1;
+                        return Column(
+                          children: [
+                            ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              leading: item.image != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Container(
+                                        color: Colors.white,
+                                        child: Image.network(item.image!, width: 40, height: 40, fit: BoxFit.contain),
+                                      ),
+                                    )
+                                  : Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(Icons.checkroom, color: Colors.grey, size: 20),
+                                    ),
+                              title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text('Qty: ${item.quantity} • ₹${item.price.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11)),
+                              trailing: Text('₹${item.total.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ),
+                            if (!isLast) Divider(height: 1, color: Colors.grey.shade200),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Delivery Address
-                  const Text('Delivery Address', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
+                  const Text('Delivery Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
                   Card(
+                    elevation: 1,
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF47721).withAlpha(30),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   widget.address['label'] ?? 'Address',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF47721)),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFF47721)),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(widget.address['receiverName'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
-                          Text(widget.address['addressLine1'] ?? ''),
+                          const SizedBox(height: 6),
+                          Text(widget.address['receiverName'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Text(widget.address['addressLine1'] ?? '', style: const TextStyle(fontSize: 12)),
                           if (widget.address['landmark'] != null && (widget.address['landmark'] as String).isNotEmpty)
-                            Text('Landmark: ${widget.address['landmark']}'),
-                          Text('${widget.address['city']}, ${widget.address['state']} - ${widget.address['pincode']}'),
-                          Text('Phone: ${widget.address['phone']}'),
+                            Text('Near ${widget.address['landmark']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('${widget.address['city']}, ${widget.address['state']} - ${widget.address['pincode']}', style: const TextStyle(fontSize: 11)),
+                          Text('📞 ${widget.address['phone']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Payment Method
-                  const Text('Payment Method', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
+                  const Text('Payment', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
                   Card(
+                    elevation: 1,
                     child: ListTile(
-                      leading: const Icon(Icons.money, color: Color(0xFFF47721)),
-                      title: Text(widget.paymentMethod == 'cod' ? 'Cash on Delivery' : 'Online Payment'),
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      leading: const Icon(Icons.money, color: Color(0xFFF47721), size: 22),
+                      title: Text(widget.paymentMethod == 'cod' ? 'Cash on Delivery' : 'Online Payment', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Price Breakdown
-                  const Text('Price Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
+                  const Text('Bill Details', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
                   Card(
+                    elevation: 1,
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(12),
                       child: Column(
                         children: [
                           _PriceRow('Subtotal', subtotal),
                           if (discount > 0) _PriceRow('Discount', -discount, color: Colors.green),
-                          _PriceRow('Delivery Fee', deliveryFee),
-                          _PriceRow('Taxes', tax),
-                          const Divider(height: 24),
-                          _PriceRow('Total', grandTotal, isBold: true, fontSize: 18),
+                          _PriceRow('Delivery', deliveryFee),
+                          _PriceRow('Tax', tax),
+                          Divider(height: 16, color: Colors.grey.shade300),
+                          _PriceRow('Total', grandTotal, isBold: true, fontSize: 16),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                        Icon(Icons.info_outline, color: Colors.blue, size: 18),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Estimated delivery: 25-45 mins\nCancellation available before pickup',
-                            style: TextStyle(fontSize: 12, color: Colors.blue),
+                            '⏱️ Delivery: 25-45 mins\n❌ Cancel before pickup',
+                            style: TextStyle(fontSize: 11, color: Colors.blue),
                           ),
                         ),
                       ],
@@ -285,21 +313,22 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
               ),
             ),
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.grey.withAlpha(50), blurRadius: 8, offset: const Offset(0, -2))],
+          boxShadow: [BoxShadow(color: Colors.grey.withAlpha(30), blurRadius: 6, offset: const Offset(0, -2))],
         ),
         child: ElevatedButton(
           onPressed: _placing ? null : _placeOrder,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFF47721),
             foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 48),
+            minimumSize: const Size(double.infinity, 44),
+            disabledBackgroundColor: Colors.grey.shade300,
           ),
           child: _placing
-              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : Text('Place Order • ₹${grandTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : Text('Place Order • ₹${grandTotal.toStringAsFixed(0)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         ),
       ),
     );
@@ -313,18 +342,18 @@ class _PriceRow extends StatelessWidget {
   final double fontSize;
   final Color? color;
 
-  const _PriceRow(this.label, this.amount, {this.isBold = false, this.fontSize = 14, this.color});
+  const _PriceRow(this.label, this.amount, {this.isBold = false, this.fontSize = 12, this.color});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(fontSize: fontSize, fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: color)),
           Text(
-            '₹${amount.abs().toStringAsFixed(2)}',
+            '₹${amount.abs().toStringAsFixed(0)}',
             style: TextStyle(fontSize: fontSize, fontWeight: isBold ? FontWeight.bold : FontWeight.w500, color: color ?? (amount < 0 ? Colors.green : Colors.black)),
           ),
         ],

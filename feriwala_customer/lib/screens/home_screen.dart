@@ -41,12 +41,12 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   static const _tagSections = [
-    {'title': 'Party Wear',    'keys': ['party','gown','dress']},
-    {'title': 'Casual Wear',   'keys': ['casual']},
-    {'title': 'Gym Wear',      'keys': ['gym','active','sports']},
-    {'title': 'Summer Picks',  'keys': ['summer','cotton','lightweight']},
-    {'title': 'Ethnic',        'keys': ['ethnic','kurta','saree']},
-    {'title': 'Formal',        'keys': ['formal','office','blazer']},
+    {'title': '🔥 Best Sellers',    'keys': ['party','gown','dress'], 'badge': 'hot'},
+    {'title': '💰 50% Off',   'keys': ['casual'], 'badge': 'sale'},
+    {'title': '✨ New Arrivals',      'keys': ['gym','active','sports'], 'badge': 'new'},
+    {'title': '🎉 Party Wear',  'keys': ['summer','cotton','lightweight'], 'badge': null},
+    {'title': '🕉️ Ethnic',        'keys': ['ethnic','kurta','saree'], 'badge': null},
+    {'title': '👔 Formal',        'keys': ['formal','office','blazer'], 'badge': null},
   ];
 
   @override
@@ -106,10 +106,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final nearby = shops.where((s) {
         final d = _dist(s); return d != null && d <= _maxDistKm;
       }).toList()..sort((a, b) => (_dist(a) ?? 9999).compareTo(_dist(b) ?? 9999));
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _nearbyWarehouses = nearby;
         _selectedWarehouse = nearby.isNotEmpty ? nearby.first as Map<String, dynamic> : null;
       });
+      }
     } catch (_) {}
   }
 
@@ -133,10 +135,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final res = await ApiService().get('/products', queryParams: params);
       final list = (res['data'] as List? ?? []).whereType<Map>()
           .map((e) => e.map((k, v) => MapEntry(k.toString(), v))).toList();
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _browseProducts = reset ? list : [..._browseProducts, ...list];
         _hasMore = list.length >= 30;
       });
+      }
     } catch (_) {
       if (mounted) setState(() { if (reset) _browseProducts = []; });
     } finally {
@@ -154,8 +158,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Map<String, dynamic>> _personalizedProducts() {
-    if (_recentProducts.isEmpty) return _browseProducts.take(10).whereType<Map>()
+    if (_recentProducts.isEmpty) {
+      return _browseProducts.take(10).whereType<Map>()
         .map((e) => e.map((k, v) => MapEntry(k.toString(), v))).toList();
+    }
     final recentIds = _recentProducts.map((e) => e['id']).toSet();
     final recentTypes = _recentProducts.map((e) => (e['productType'] ?? '')).toSet();
     return _browseProducts.whereType<Map>()
@@ -193,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSubmitted: (_) => _loadProducts(reset: true),
               )
             : Row(children: [
-                Text('feriwala', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: _kOrange, letterSpacing: -0.5)),
+                const Text('feriwala', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: _kOrange, letterSpacing: -0.5)),
                 if (_selectedWarehouse != null) ...[
                   const SizedBox(width: 8),
                   GestureDetector(
@@ -397,15 +403,15 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () { setState(() => _selectedProductType = value); _loadProducts(reset: true); },
       child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        margin: const EdgeInsets.only(right: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: selected ? _kOrange : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? _kOrange : Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? _kOrange : Colors.transparent, width: 1.5),
         ),
         child: Text(label, style: TextStyle(
-          fontSize: 12, fontWeight: FontWeight.w500,
+          fontSize: 11, fontWeight: FontWeight.w600,
           color: selected ? Colors.white : Colors.black87,
         )),
       ),
@@ -422,10 +428,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const Spacer(),
           GestureDetector(
             onTap: () => Navigator.pushNamed(context, '/category-products', arguments: {'title': title, 'searchKeys': searchKeys}),
-            child: Row(children: [
-              const Text('See all', style: TextStyle(fontSize: 12, color: _kOrange, fontWeight: FontWeight.w500)),
-              const SizedBox(width: 4),
-              const Icon(Icons.arrow_forward_ios, size: 12, color: _kOrange),
+            child: const Row(children: [
+              Text('See all', style: TextStyle(fontSize: 12, color: _kOrange, fontWeight: FontWeight.w500)),
+              SizedBox(width: 4),
+              Icon(Icons.arrow_forward_ios, size: 12, color: _kOrange),
             ]),
           ),
         ]),
@@ -481,6 +487,20 @@ class _ProductCard extends StatelessWidget {
     final mrp = product['mrp']?.toString() ?? '';
     final discount = double.tryParse((product['discount'] ?? '0').toString()) ?? 0;
     final brand = product['brand'] ?? '';
+    final tags = (product['tags'] as List? ?? []).map((e) => e.toString().toLowerCase()).toList();
+    
+    String? badge;
+    Color? badgeColor;
+    if (tags.contains('bestseller') || tags.contains('best seller')) {
+      badge = 'BEST SELLER';
+      badgeColor = Colors.red;
+    } else if (discount >= 50) {
+      badge = '50% OFF';
+      badgeColor = Colors.green;
+    } else if (tags.contains('new') || tags.contains('new arrival')) {
+      badge = 'NEW';
+      badgeColor = Colors.blue;
+    }
 
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/product', arguments: product['id']),
@@ -495,29 +515,46 @@ class _ProductCard extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: AspectRatio(
-              aspectRatio: 0.9,
-              child: images.isNotEmpty
-                  ? Image.network(images[0], fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.checkroom, color: Colors.grey)))
-                  : Container(color: Colors.grey.shade100, child: const Icon(Icons.checkroom, color: Colors.grey, size: 40)),
+            child: Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 0.9,
+                  child: images.isNotEmpty
+                      ? Image.network(images[0], fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.checkroom, color: Colors.grey)))
+                      : Container(color: Colors.grey.shade100, child: const Icon(Icons.checkroom, color: Colors.grey, size: 40)),
+                ),
+                if (badge != null)
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: badgeColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (brand.isNotEmpty) Text(brand, style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
-              Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+              if (brand.isNotEmpty) Text(brand, style: TextStyle(fontSize: 9, color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
+              Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, height: 1.2)),
               const SizedBox(height: 4),
               Row(children: [
                 Text('₹$price', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFF47721))),
                 if (mrp != price && mrp.isNotEmpty) ...[
                   const SizedBox(width: 4),
-                  Text('₹$mrp', style: const TextStyle(decoration: TextDecoration.lineThrough, fontSize: 11, color: Colors.grey)),
+                  Text('₹$mrp', style: const TextStyle(decoration: TextDecoration.lineThrough, fontSize: 10, color: Colors.grey)),
                 ],
               ]),
               if (discount > 0)
-                Text('${discount.toStringAsFixed(0)}% off', style: const TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.w500)),
+                Text('${discount.toStringAsFixed(0)}% off', style: const TextStyle(fontSize: 9, color: Colors.green, fontWeight: FontWeight.w600)),
             ]),
           ),
         ]),

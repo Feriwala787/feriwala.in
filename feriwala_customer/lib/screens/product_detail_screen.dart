@@ -91,7 +91,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   bool _isVariantSelectable(String size, String color) {
     if (_variantStock.isEmpty) return true;
-    final key = '${size}__${color}';
+    final key = '${size}__$color';
     return (int.tryParse(_variantStock[key].toString()) ?? 0) > 0;
   }
 
@@ -245,10 +245,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 controller: _pageController,
                                 itemCount: (_product!['images'] as List).length,
                                 onPageChanged: (i) => setState(() => _selectedImageIndex = i),
-                                itemBuilder: (context, i) => Image.network(
-                                  _product!['images'][i],
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
+                                itemBuilder: (context, i) => Container(
+                                  color: Colors.white,
+                                  child: Image.network(
+                                    _product!['images'][i],
+                                    fit: BoxFit.contain,
+                                    width: double.infinity,
+                                  ),
                                 ),
                               )
                             : Container(
@@ -271,9 +274,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   border: Border.all(color: _selectedImageIndex == i ? const Color(0xFFF47721) : Colors.transparent, width: 2),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Image.network((_product!['images'] as List)[i], width: 54, height: 54, fit: BoxFit.cover),
+                                child: Container(
+                                  color: Colors.white,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.network((_product!['images'] as List)[i], width: 54, height: 54, fit: BoxFit.contain),
+                                  ),
                                 ),
                               ),
                             ),

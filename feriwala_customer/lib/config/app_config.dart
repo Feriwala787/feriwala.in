@@ -11,6 +11,7 @@ class AppConfig {
   static const String awsRegion = 'ap-south-1';
   static const String awsAccessKeyId = String.fromEnvironment('AWS_ACCESS_KEY_ID', defaultValue: '');
   static const String awsSecretAccessKey = String.fromEnvironment('AWS_SECRET_ACCESS_KEY', defaultValue: '');
+  static const String awsLocationApiKey = String.fromEnvironment('AWS_LOCATION_API_KEY', defaultValue: '');
   static const String awsMapName = 'feriwala-map';
   static const String awsPlaceIndexName = 'feriwala-places';
 }
