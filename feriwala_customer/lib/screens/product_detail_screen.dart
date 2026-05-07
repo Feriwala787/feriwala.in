@@ -151,10 +151,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final entry = jsonEncode({
       'id': _product!['id'],
       'name': _product!['name'],
-      'image': (_product!['images'] as List?)?.isNotEmpty == true ? _product!['images'][0] : null,
+      'images': (_product!['images'] as List?)?.isNotEmpty == true ? [_product!['images'][0]] : [],
       'sellingPrice': _product!['sellingPrice'],
+      'mrp': _product!['mrp'],
+      'discount': _product!['discount'],
+      'brand': _product!['brand'],
+      'tags': _product!['tags'] ?? [],
+      'attributes': _product!['attributes'],
+      'productType': _product!['attributes']?['productType'],
     });
-    list.removeWhere((e) => e.contains('"id":${_product!['id']}'));
+    list.removeWhere((e) { try { return jsonDecode(e)['id'] == _product!['id']; } catch (_) { return false; } });
     list.insert(0, entry);
     await prefs.setStringList('recent_products', list.take(12).toList());
   }
