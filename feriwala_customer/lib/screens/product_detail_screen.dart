@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../providers/cart_provider.dart';
 import '../services/analytics_service.dart';
+import '../widgets/feri_image.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final int productId;
@@ -245,13 +246,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 controller: _pageController,
                                 itemCount: (_product!['images'] as List).length,
                                 onPageChanged: (i) => setState(() => _selectedImageIndex = i),
-                                itemBuilder: (context, i) => Container(
-                                  color: Colors.white,
-                                  child: Image.network(
-                                    _product!['images'][i],
-                                    fit: BoxFit.contain,
-                                    width: double.infinity,
-                                  ),
+                                itemBuilder: (context, i) => FeriImage(
+                                  url: _product!['images'][i].toString(),
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
                                 ),
                               )
                             : Container(
@@ -274,12 +272,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   border: Border.all(color: _selectedImageIndex == i ? const Color(0xFFF47721) : Colors.transparent, width: 2),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Container(
-                                  color: Colors.white,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: Image.network((_product!['images'] as List)[i], width: 54, height: 54, fit: BoxFit.contain),
-                                  ),
+                                child: FeriImage(
+                                  url: (_product!['images'] as List)[i].toString(),
+                                  width: 54,
+                                  height: 54,
+                                  fit: BoxFit.contain,
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
                             ),

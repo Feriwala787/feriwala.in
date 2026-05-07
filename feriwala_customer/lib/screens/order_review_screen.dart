@@ -4,6 +4,7 @@ import '../providers/cart_provider.dart';
 import '../services/api_service.dart';
 import '../services/analytics_service.dart';
 import '../utils/api_error_mapper.dart';
+import '../widgets/feri_image.dart';
 
 class OrderReviewScreen extends StatefulWidget {
   final Map<String, dynamic> address;
@@ -56,28 +57,32 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
         final productRes = await ApiService().get('/products/${item.productId}');
         final product = productRes['data'] as Map<String, dynamic>;
         final latestPrice = (product['sellingPrice'] as num).toDouble();
-        final inventory = (product['inventory'] as List?) ?? const [];
-        final availableQty = inventory.isNotEmpty ? ((inventory.first['quantity'] ?? 0) as num).toInt() : 0;
-        
+        // inventory is nested under product
+        final inventory = (product['inventory'] as List?) ?? [];
+        final inv = inventory.isNotEmpty ? inventory[0] : null;
+        final qty = inv != null ? ((inv['quantity'] ?? 0) as num).toInt() : 0;
+        final reserved = inv != null ? ((inv['reservedQuantity'] ?? 0) as num).toInt() : 0;
+        final availableQty = qty - reserved;
+
         if (availableQty < item.quantity) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Insufficient stock for ${item.name}')),
+              SnackBar(content: Text('Only $availableQty left for ${item.name}'), backgroundColor: Colors.orange),
             );
           }
           return false;
         }
-        
-        if ((latestPrice - item.price).abs() > 0.01) {
+
+        if ((latestPrice - item.price).abs() > 0.5) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('One or more prices changed. Please review cart.')),
+              SnackBar(content: Text('Price changed for ${item.name}: ₹${latestPrice.toStringAsFixed(0)}'), backgroundColor: Colors.orange),
             );
           }
           return false;
         }
       } catch (_) {
-        return false;
+        // If product check fails, let backend validate
       }
     }
     return true;
@@ -222,12 +227,12 @@ class _OrderReviewScreenState extends State<OrderReviewScreen> {
                               dense: true,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                               leading: item.image != null
-                                  ? ClipRRect(
+                                  ? FeriImage(
+                                      url: item.image,
+                                      width: 40,
+                                      height: 40,
+                                      fit: BoxFit.contain,
                                       borderRadius: BorderRadius.circular(6),
-                                      child: Container(
-                                        color: Colors.white,
-                                        child: Image.network(item.image!, width: 40, height: 40, fit: BoxFit.contain),
-                                      ),
                                     )
                                   : Container(
                                       width: 40,

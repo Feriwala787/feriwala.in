@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../utils/formatters.dart';
+import '../widgets/feri_image.dart';
 
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
@@ -39,16 +40,11 @@ class CartScreen extends StatelessWidget {
                           child: Row(
                             children: [
                               // Image
-                              ClipRRect(
+                              FeriImage(
+                                url: item.image,
+                                width: 70,
+                                height: 70,
                                 borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  width: 70,
-                                  height: 70,
-                                  color: Colors.grey[200],
-                                  child: item.image != null
-                                      ? Image.network(item.image!, fit: BoxFit.cover)
-                                      : const Icon(Icons.checkroom, color: Colors.grey),
-                                ),
                               ),
                               const SizedBox(width: 12),
                               // Details

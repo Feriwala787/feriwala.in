@@ -38,7 +38,8 @@ class ApiService {
       {Map<String, String>? queryParams}) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$endpoint')
         .replace(queryParameters: queryParams);
-    return _requestWithAutoRefresh(() => http.get(uri, headers: _headers()));
+    return _requestWithAutoRefresh(
+        () => http.get(uri, headers: _headers()).timeout(const Duration(seconds: 15)));
   }
 
   Future<Map<String, dynamic>> post(String endpoint,
@@ -47,7 +48,7 @@ class ApiService {
       Uri.parse('${AppConfig.apiBaseUrl}$endpoint'),
       headers: _headers(extra: headers),
       body: jsonEncode(body),
-    ));
+    ).timeout(const Duration(seconds: 20)));
   }
 
   Future<Map<String, dynamic>> put(String endpoint,
@@ -56,7 +57,7 @@ class ApiService {
       Uri.parse('${AppConfig.apiBaseUrl}$endpoint'),
       headers: _headers(),
       body: jsonEncode(body),
-    ));
+    ).timeout(const Duration(seconds: 15)));
   }
 
 
@@ -103,14 +104,20 @@ class ApiService {
   }
 
   Map<String, dynamic> _handleResponse(http.Response response) {
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw ApiException('Server returned an invalid response', response.statusCode);
+    }
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return data;
     } else {
-      throw ApiException(
-        data['message'] ?? 'Something went wrong',
-        response.statusCode,
-      );
+      // Extract the most specific error message available
+      final message = data['message']
+          ?? (data['errors'] as List?)?.map((e) => e['msg'] ?? e['message'] ?? e.toString()).join(', ')
+          ?? 'Something went wrong';
+      throw ApiException(message.toString(), response.statusCode);
     }
   }
 }

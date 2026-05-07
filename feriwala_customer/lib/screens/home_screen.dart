@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import '../services/location_service.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/feri_image.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -105,18 +106,32 @@ class _HomeScreenState extends State<HomeScreen> {
     final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
     if (!mounted) return;
     setState(() => _currentPosition = pos);
-    // Reverse geocode to get readable address
-    final geo = await LocationService.geocode('${pos.latitude},${pos.longitude}');
-    if (mounted) {
-      setState(() {
-        if (geo != null) {
-          final parts = geo.label.split(',').map((e) => e.trim()).toList();
-          _locationLabel = parts.take(2).join(', ');
-        } else {
-          _locationLabel = '${pos.latitude.toStringAsFixed(3)}, ${pos.longitude.toStringAsFixed(3)}';
+
+    // Try AWS Location Service first, fallback to backend reverse geocode
+    String label = '${pos.latitude.toStringAsFixed(3)}, ${pos.longitude.toStringAsFixed(3)}';
+    try {
+      final geo = await LocationService.geocode('${pos.latitude},${pos.longitude}');
+      if (geo != null) {
+        final parts = geo.label.split(',').map((e) => e.trim()).toList();
+        label = parts.take(2).join(', ');
+      } else {
+        // Fallback: backend reverse geocode
+        final res = await ApiService().post('/location/reverse-geocode', body: {
+          'latitude': pos.latitude,
+          'longitude': pos.longitude,
+        });
+        final data = res['data'];
+        if (data != null) {
+          final parts = <String>[];
+          if (data['street'] != null) parts.add(data['street']);
+          if (data['neighborhood'] != null) parts.add(data['neighborhood']);
+          if (data['municipality'] != null) parts.add(data['municipality']);
+          if (parts.isNotEmpty) label = parts.take(2).join(', ');
         }
-      });
-    }
+      }
+    } catch (_) {}
+
+    if (mounted) setState(() => _locationLabel = label);
     await _loadWarehouses();
   }
 
@@ -640,10 +655,14 @@ class _ProductCard extends StatelessWidget {
               children: [
                 AspectRatio(
                   aspectRatio: 0.9,
-                  child: images.isNotEmpty
-                      ? Image.network(images[0], fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade100, child: const Icon(Icons.checkroom, color: Colors.grey)))
-                      : Container(color: Colors.grey.shade100, child: const Icon(Icons.checkroom, color: Colors.grey, size: 40)),
+                  child: FeriImage(
+                    url: images.isNotEmpty ? images[0].toString() : null,
+                    fit: BoxFit.contain,
+                    fallbackWidget: Container(
+                      color: Colors.grey.shade100,
+                      child: const Icon(Icons.checkroom, color: Colors.grey, size: 40),
+                    ),
+                  ),
                 ),
                 if (badge != null)
                   Positioned(

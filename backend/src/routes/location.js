@@ -78,9 +78,9 @@ router.post('/serviceability', authenticate, authorize('customer'), [
 /**
  * 1B. REVERSE GEOCODING
  * POST /api/location/reverse-geocode
- * Convert coordinates to formatted address
+ * Convert coordinates to formatted address (no auth required - used on home screen)
  */
-router.post('/reverse-geocode', authenticate, [
+router.post('/reverse-geocode', [
   body('latitude').isFloat({ min: -90, max: 90 }),
   body('longitude').isFloat({ min: -180, max: 180 }),
 ], async (req, res) => {
@@ -110,9 +110,9 @@ router.post('/reverse-geocode', authenticate, [
 /**
  * 1C. FORWARD GEOCODING / PLACE SEARCH
  * POST /api/location/search
- * Search for places and get coordinates
+ * Search for places and get coordinates (no auth required - used in address form)
  */
-router.post('/search', authenticate, [
+router.post('/search', [
   body('query').isString().isLength({ min: 3 }),
 ], async (req, res) => {
   try {

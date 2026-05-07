@@ -2,9 +2,9 @@ import '../services/api_service.dart';
 
 String mapApiError(Object error) {
   if (error is ApiException) {
+    // Always show the actual server message first — it's specific and useful
+    if (error.message.isNotEmpty) return error.message;
     switch (error.statusCode) {
-      case 400:
-        return 'Please review your details and try again.';
       case 401:
         return 'Please login again to continue.';
       case 403:
@@ -13,8 +13,6 @@ String mapApiError(Object error) {
         return 'Requested resource was not found.';
       case 409:
         return 'This action was already processed.';
-      case 422:
-        return 'Some fields are invalid. Please correct and retry.';
       case 500:
       case 502:
       case 503:
