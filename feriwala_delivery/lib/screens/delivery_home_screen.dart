@@ -256,14 +256,14 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> with WidgetsBin
               Text(auth.isOnline ? 'Online' : 'Offline', style: const TextStyle(fontSize: 12)),
               Switch(
                 value: auth.isOnline,
-                onChanged: auth.isLoading ? null : (_) async {
+                onChanged: auth.isLoading ? null : (value) async {
                   try {
-                    await auth.toggleOnline();
-                    _pushLocationIfOnline();
+                    await auth.setOnline(value);
+                    if (value) _pushLocationIfOnline();
                   } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to go online: ${e.toString().replaceAll('Exception: ', '')}'), backgroundColor: Colors.red),
+                        SnackBar(content: Text('Failed: ${e.toString().replaceAll('Exception: ', '')}'), backgroundColor: Colors.red),
                       );
                     }
                   }

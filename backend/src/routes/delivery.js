@@ -353,7 +353,7 @@ router.put('/online-status', authenticate, authorize('delivery_agent'), async (r
     const profile = await DeliveryAgentProfile.findOneAndUpdate(
       { userId: req.user._id },
       { isOnline, isAvailable: isOnline },
-      { new: true }
+      { new: true, upsert: true }
     );
     res.json({ success: true, data: profile });
   } catch (error) {

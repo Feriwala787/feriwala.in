@@ -61,11 +61,11 @@ class DeliveryAuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> toggleOnline() async {
+  Future<void> setOnline(bool value) async {
     _isLoading = true;
     notifyListeners();
     try {
-      final res = await _api.put('/delivery/online');
+      final res = await _api.put('/delivery/online-status', body: {'isOnline': value});
       _isOnline = res['data']?['isOnline'] == true;
     } catch (e) {
       rethrow;
