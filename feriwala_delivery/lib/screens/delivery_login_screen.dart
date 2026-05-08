@@ -15,6 +15,36 @@ class _DeliveryLoginScreenState extends State<DeliveryLoginScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
+  @override
+  void initState() {
+    super.initState();
+    // If already authenticated (token restored on init), skip login screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<DeliveryAuthProvider>();
+      if (auth.isAuthenticated) {
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // Listen for auth state change (init() completes async)
+        auth.addListener(_onAuthChanged);
+      }
+    });
+  }
+
+  void _onAuthChanged() {
+    final auth = context.read<DeliveryAuthProvider>();
+    if (auth.isAuthenticated && mounted) {
+      auth.removeListener(_onAuthChanged);
+      Navigator.pushReplacementNamed(context, '/home');
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     try {
