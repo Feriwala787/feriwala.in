@@ -16,6 +16,16 @@ const MAX_ACTIVE_TASKS_PER_AGENT = 4;
 const STALLED_TASK_MINUTES = 20;
 const LONG_TRANSIT_MINUTES = 45;
 
+const { isMongoReady } = require('../database/mongodb');
+
+router.use((req, res, next) => {
+  if (!isMongoReady()) {
+    res.set('Retry-After', '5');
+    return res.status(503).json({ success: false, message: 'Service temporarily unavailable. Please retry shortly.' });
+  }
+  return next();
+});
+
 async function getAgentLoadMap(agentIds = []) {
   if (agentIds.length === 0) return {};
   const rows = await DeliveryTask.findAll({
@@ -71,6 +81,16 @@ async function getNearbyAvailableAgents({ shopId, shopLat, shopLng }) {
     return { agent, distance, activeTaskCount, canTakeMoreTasks: activeTaskCount < MAX_ACTIVE_TASKS_PER_AGENT, score };
   }).sort((a, b) => a.distance - b.distance);
 }
+
+// Get delivery agent's own profile (online status etc.)
+router.get('/my-profile', authenticate, authorize('delivery_agent'), async (req, res) => {
+  try {
+    const profile = await DeliveryAgentProfile.findOne({ userId: req.user._id });
+    res.json({ success: true, data: profile });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
 
 // Nearby available agents for a shop (shop + customer visibility)
 router.get('/agents/nearby/:shopId', authenticate, authorize('shop_admin', 'admin', 'customer'), async (req, res) => {

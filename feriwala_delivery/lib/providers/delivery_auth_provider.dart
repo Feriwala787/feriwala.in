@@ -23,11 +23,23 @@ class DeliveryAuthProvider extends ChangeNotifier {
         _user = res['data'];
         if (_user?['role'] == 'delivery_agent') {
           _isAuthenticated = true;
+          // Restore online status from profile
+          try {
+            final profileRes = await _api.get('/delivery/my-profile');
+            _isOnline = profileRes['data']?['isOnline'] == true;
+          } catch (_) {}
         } else {
           await _api.clearToken();
         }
       } catch (e) {
-        await _api.clearToken();
+        // Only clear tokens on auth errors, not network/server errors
+        final msg = e.toString();
+        if (msg.contains('Invalid') || msg.contains('expired') || msg.contains('401') || msg.contains('403')) {
+          await _api.clearToken();
+        } else {
+          // Keep tokens — transient error, stay logged in
+          _isAuthenticated = true;
+        }
       }
     }
     notifyListeners();
