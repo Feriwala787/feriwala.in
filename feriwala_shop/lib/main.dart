@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'services/error_reporter.dart';
 import 'services/required_permissions_service.dart';
+import 'services/location_gate_service.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'providers/shop_auth_provider.dart';
@@ -72,7 +73,8 @@ class FeriwalaShopApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ShopAuthProvider()..init()),
       ],
-      child: MaterialApp(
+      child: LocationGate(
+        child: MaterialApp(
         title: 'Feriwala Shop',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
@@ -113,6 +115,42 @@ class FeriwalaShopApp extends StatelessWidget {
         },
         onUnknownRoute: (settings) => _invalidRoute(settings.name ?? 'unknown'),
       ),
+    ),
     );
   }
+}
+
+class LocationGate extends StatefulWidget {
+  final Widget child;
+  const LocationGate({super.key, required this.child});
+  @override
+  State<LocationGate> createState() => _LocationGateState();
+}
+
+class _LocationGateState extends State<LocationGate> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _check();
+  }
+
+  Future<void> _check() async {
+    if (!mounted) return;
+    await LocationGateService.instance.ensureLocationReady(context);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
