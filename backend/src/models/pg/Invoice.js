@@ -3,7 +3,7 @@ const { sequelize } = require('../../database/postgres');
 
 const Invoice = sequelize.define('Invoice', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  invoiceNumber: { type: DataTypes.STRING(30), allowNull: false, unique: true },
+  invoiceNumber: { type: DataTypes.STRING(50), allowNull: false, unique: true },
   orderId: { type: DataTypes.INTEGER, allowNull: false },
   shopId: { type: DataTypes.INTEGER, allowNull: false },
   customerId: { type: DataTypes.STRING(30), allowNull: false },

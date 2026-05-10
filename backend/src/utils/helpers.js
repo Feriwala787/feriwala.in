@@ -27,7 +27,8 @@ function generateInvoiceNumber(shopCode) {
   const y = date.getFullYear().toString().slice(-2);
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const random = Math.random().toString(36).substring(2, 7).toUpperCase();
-  return `INV-${shopCode}-${y}${m}-${random}`;
+  const code = (shopCode || 'XX').substring(0, 12);
+  return `INV-${code}-${y}${m}-${random}`;
 }
 
 function generateOtp() {

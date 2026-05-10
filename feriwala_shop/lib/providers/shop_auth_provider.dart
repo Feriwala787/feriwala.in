@@ -50,10 +50,54 @@ class ShopAuthProvider extends ChangeNotifier {
           await _api.clearToken();
         }
       } catch (e) {
-        await _api.clearToken();
+        // Only clear session on definitive auth failure, not network errors
+        if (e.toString().contains('401') || e.toString().contains('Invalid token') || e.toString().contains('Token expired')) {
+          final refreshed = await _tryRefreshToken();
+          if (refreshed) {
+            try {
+              final res = await _api.get('/auth/profile');
+              _user = res['data'];
+              _shopId = _user?['shopId'];
+              if (_user?['role'] == 'shop_admin') {
+                _isAuthenticated = true;
+                if (_shopId != null) {
+                  _pushService.initForShopUser(shopId: _shopId!, role: _user?['role'] ?? 'shop_admin');
+                  await _checkShopLocation();
+                }
+              } else {
+                await _api.clearToken();
+              }
+            } catch (_) {
+              await _api.clearToken();
+            }
+          } else {
+            await _api.clearToken();
+          }
+        }
+        // For network errors, keep tokens — user stays logged in
       }
     }
     notifyListeners();
+  }
+
+  Future<bool> _tryRefreshToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final refreshToken = prefs.getString('shop_refresh_token');
+      if (refreshToken == null) return false;
+      // Use the API service's internal refresh
+      final res = await _api.post('/auth/refresh', body: {'refreshToken': refreshToken});
+      final accessToken = res['data']?['accessToken'];
+      final newRefreshToken = res['data']?['refreshToken'];
+      if (accessToken == null) return false;
+      await _api.setToken(accessToken.toString());
+      if (newRefreshToken != null) {
+        await prefs.setString('shop_refresh_token', newRefreshToken.toString());
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> login(String email, String password) async {

@@ -57,8 +57,23 @@ class AuthProvider extends ChangeNotifier {
         _connectSocketIfPossible();
       } catch (e) {
         if (e is ApiException && e.statusCode == 401) {
-          await _clearSession();
+          // Try refreshing the token before giving up
+          final refreshed = await _api.refreshAccessToken();
+          if (refreshed) {
+            try {
+              final res = await _api.get('/auth/profile');
+              _user = res['data'];
+              _isAuthenticated = true;
+              _startSessionRefresh();
+              _connectSocketIfPossible();
+            } catch (_) {
+              await _clearSession();
+            }
+          } else {
+            await _clearSession();
+          }
         }
+        // For network errors, keep session alive — don't clear tokens
       }
     }
     notifyListeners();

@@ -15,6 +15,27 @@ class _ShopLoginScreenState extends State<ShopLoginScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _obscure = true;
+  bool _checkedAuth = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_checkedAuth) {
+      _checkedAuth = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _redirectIfAuthenticated());
+    }
+  }
+
+  void _redirectIfAuthenticated() {
+    final auth = context.read<ShopAuthProvider>();
+    if (auth.isAuthenticated) {
+      if (auth.shopLocationNeeded) {
+        Navigator.pushReplacementNamed(context, '/seed-location');
+      } else {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
+    }
+  }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
