@@ -1,60 +1,30 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
-/// Appwrite SMS OTP service for phone verification.
-/// Uses Appwrite Phone auth to send and verify OTP codes.
+/// SMS OTP service that routes through our backend.
+/// Backend uses Appwrite server API key to send/verify OTP.
 class AppwriteOtpService {
   AppwriteOtpService._();
   static final AppwriteOtpService instance = AppwriteOtpService._();
 
-  // Appwrite project config — replace with your actual values
-  static const String _endpoint = 'https://cloud.appwrite.io/v1';
-  static const String _projectId = '6839e88b001e3fa498c0';
-
   String? _userId;
+  String? get lastUserId => _userId;
 
-  Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'X-Appwrite-Project': _projectId,
-      };
-
-  /// Send OTP to phone number. Returns true if sent successfully.
+  /// Send OTP to phone number via our backend.
   /// [phone] must be in E.164 format e.g. +919876543210
   Future<bool> sendOtp(String phone) async {
     try {
       final response = await http.post(
-        Uri.parse('$_endpoint/account/tokens/phone'),
-        headers: _headers,
-        body: jsonEncode({
-          'userId': 'unique()',
-          'phone': phone,
-        }),
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/send-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phone}),
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        _userId = data['userId'] ?? data['\$id'];
-        return true;
-      }
-
-      // If user already exists in Appwrite, try creating session directly
-      if (response.statusCode == 409) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        _userId = data['userId'] ?? data['message']?.toString().split(':').last.trim();
-        // Retry with existing userId
-        final retryResponse = await http.post(
-          Uri.parse('$_endpoint/account/tokens/phone'),
-          headers: _headers,
-          body: jsonEncode({
-            'userId': _userId,
-            'phone': phone,
-          }),
-        );
-        if (retryResponse.statusCode >= 200 && retryResponse.statusCode < 300) {
-          final retryData = jsonDecode(retryResponse.body) as Map<String, dynamic>;
-          _userId = retryData['userId'] ?? retryData['\$id'];
-          return true;
-        }
+        _userId = data['data']?['userId'];
+        return data['success'] == true;
       }
       return false;
     } catch (_) {
@@ -62,19 +32,21 @@ class AppwriteOtpService {
     }
   }
 
-  /// Verify OTP code. Returns true if verification successful.
+  /// Verify OTP code via our backend.
   Future<bool> verifyOtp(String otp) async {
     if (_userId == null) return false;
     try {
-      final response = await http.put(
-        Uri.parse('$_endpoint/account/sessions/phone'),
-        headers: _headers,
-        body: jsonEncode({
-          'userId': _userId,
-          'secret': otp,
-        }),
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/verify-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': _userId, 'otp': otp}),
       );
-      return response.statusCode >= 200 && response.statusCode < 300;
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return data['success'] == true;
+      }
+      return false;
     } catch (_) {
       return false;
     }

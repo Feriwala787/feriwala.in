@@ -363,6 +363,47 @@ router.post('/reset-password', [
   }
 });
 
+const { sendPhoneOtp, verifyPhoneOtp } = require('../services/appwriteOtpService');
+
+// Send SMS OTP (Appwrite)
+router.post('/send-otp', [
+  body('phone').trim().notEmpty().withMessage('Phone number required'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+    const { phone } = req.body;
+    const result = await sendPhoneOtp(phone);
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.error || 'Failed to send OTP' });
+    }
+    res.json({ success: true, data: { userId: result.userId } });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
+// Verify SMS OTP (Appwrite)
+router.post('/verify-otp', [
+  body('userId').trim().notEmpty(),
+  body('otp').trim().isLength({ min: 6, max: 6 }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+    const { userId, otp } = req.body;
+    const result = await verifyPhoneOtp(userId, otp);
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.error || 'Invalid OTP' });
+    }
+    res.json({ success: true, message: 'Phone verified' });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
 // Reset Password via Phone (after Appwrite OTP verified on client)
 router.post('/reset-password-phone', [
   body('phone').trim().notEmpty(),
