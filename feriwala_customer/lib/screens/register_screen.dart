@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/appwrite_otp_service.dart';
+import 'otp_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -15,6 +17,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isSendingOtp = false;
 
   @override
   void dispose() {
@@ -25,8 +28,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  Future<void> _register() async {
+  String _formatPhone(String phone) {
+    phone = phone.trim();
+    if (!phone.startsWith('+')) phone = '+91$phone';
+    return phone;
+  }
+
+  Future<void> _startRegistration() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final phone = _formatPhone(_phoneController.text);
+
+    // Step 1: Send OTP via Appwrite
+    setState(() => _isSendingOtp = true);
+    final sent = await AppwriteOtpService.instance.sendOtp(phone);
+    setState(() => _isSendingOtp = false);
+
+    if (!sent) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to send OTP. Check phone number.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    // Step 2: Navigate to OTP screen
+    if (!mounted) return;
+    final verified = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OtpVerificationScreen(phone: phone, purpose: 'signup'),
+      ),
+    );
+
+    if (verified != true) return;
+
+    // Step 3: OTP verified — complete registration with backend
+    if (!mounted) return;
     try {
       await context.read<AuthProvider>().register(
             _nameController.text.trim(),
@@ -84,9 +123,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 decoration: InputDecoration(
                   labelText: 'Phone',
                   prefixIcon: const Icon(Icons.phone_outlined),
+                  prefixText: '+91 ',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                validator: (v) => v != null && v.length >= 10 ? null : 'Enter valid phone',
+                validator: (v) => v != null && v.trim().length >= 10 ? null : 'Enter valid phone',
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -103,15 +143,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               SizedBox(
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: auth.isLoading ? null : _register,
+                  onPressed: (auth.isLoading || _isSendingOtp) ? null : _startRegistration,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF47721),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: auth.isLoading
+                  child: (auth.isLoading || _isSendingOtp)
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      : const Text('Verify & Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 16),

@@ -49,31 +49,30 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token != null) {
+      // Always stay authenticated if token exists — never auto-logout
+      _isAuthenticated = true;
       try {
         final res = await _api.get('/auth/profile');
         _user = res['data'];
-        _isAuthenticated = true;
         _startSessionRefresh();
         _connectSocketIfPossible();
       } catch (e) {
         if (e is ApiException && e.statusCode == 401) {
-          // Try refreshing the token before giving up
           final refreshed = await _api.refreshAccessToken();
           if (refreshed) {
             try {
               final res = await _api.get('/auth/profile');
               _user = res['data'];
-              _isAuthenticated = true;
               _startSessionRefresh();
               _connectSocketIfPossible();
             } catch (_) {
-              await _clearSession();
+              // Keep authenticated — profile will load on next retry
             }
-          } else {
-            await _clearSession();
           }
+          // Even if refresh fails, do NOT clear session — user stays logged in
+          // They will only be logged out via explicit logout()
         }
-        // For network errors, keep session alive — don't clear tokens
+        // Network errors: keep session alive
       }
     }
     notifyListeners();

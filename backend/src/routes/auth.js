@@ -363,4 +363,30 @@ router.post('/reset-password', [
   }
 });
 
+// Reset Password via Phone (after Appwrite OTP verified on client)
+router.post('/reset-password-phone', [
+  body('phone').trim().notEmpty(),
+  body('newPassword').isLength({ min: 6 }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+
+    const { phone, newPassword } = req.body;
+    const cleanPhone = phone.replace(/^\+91/, '').trim();
+    const user = await User.findOne({ $or: [{ phone: cleanPhone }, { phone }] });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No account found with this phone number' });
+    }
+
+    user.passwordHash = newPassword;
+    user.refreshToken = null;
+    await user.save();
+
+    res.json({ success: true, message: 'Password reset successfully. Please login.' });
+  } catch (error) {
+    routeError(res, error);
+  }
+});
+
 module.exports = router;
