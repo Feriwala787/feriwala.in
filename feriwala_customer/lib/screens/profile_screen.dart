@@ -304,6 +304,8 @@ class ProfileScreen extends StatelessWidget {
             _ProfileTile(icon: Icons.help_outline, title: 'Help & Support', onTap: () {}),
             _ProfileTile(icon: Icons.privacy_tip_outlined, title: 'Privacy Policy', onTap: () => Navigator.pushNamed(context, '/privacy')),
             _ProfileTile(icon: Icons.description_outlined, title: 'Terms & Conditions', onTap: () => Navigator.pushNamed(context, '/terms')),
+            _ProfileTile(icon: Icons.assignment_return_outlined, title: 'Refund & Cancellation Policy', onTap: () => Navigator.pushNamed(context, '/refund-policy')),
+            _ProfileTile(icon: Icons.contact_mail_outlined, title: 'Contact Us', onTap: () => Navigator.pushNamed(context, '/contact')),
             _ProfileTile(icon: Icons.info_outline, title: 'About Feriwala v1.1.0', onTap: () => showAboutDialog(
               context: context,
               applicationName: 'Feriwala',

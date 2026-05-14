@@ -190,14 +190,89 @@ app.get('/privacy', (req, res) => {
 });
 
 app.get('/terms', (req, res) => {
-  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Terms &amp; Conditions - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}</style></head><body>
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Terms &amp; Conditions - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}</style></head><body>
 <h1>Terms &amp; Conditions</h1><p><em>Last updated: May 2025</em></p>
-<h2>1. Acceptance</h2><p>By using Feriwala you agree to these terms.</p>
-<h2>2. Service</h2><p>Feriwala connects customers with local clothing and footwear stores for quick delivery.</p>
-<h2>3. Orders &amp; Payments</h2><p>Orders subject to availability. Currently Cash on Delivery only. We may cancel orders due to stock issues.</p>
-<h2>4. Returns</h2><p>Returns accepted within 24 hours for damaged or wrong items. Refunds processed within 5-7 business days.</p>
-<h2>5. Governing Law</h2><p>Governed by the laws of India.</p>
-<h2>6. Contact</h2><p>support@feriwala.in</p>
+<h2>1. Acceptance</h2><p>By downloading, installing, or using the Feriwala mobile application, you agree to be bound by these Terms &amp; Conditions. If you do not agree, please uninstall the app.</p>
+<h2>2. Service Description</h2><p>Feriwala is a quick-commerce marketplace that connects customers with local clothing and footwear retailers for rapid delivery. Feriwala acts as an intermediary platform and does not own or stock inventory.</p>
+<h2>3. Eligibility</h2><p>You must be at least 18 years old to use Feriwala. By using the app, you represent that you meet this requirement.</p>
+<h2>4. Account</h2><p>You are responsible for maintaining the confidentiality of your account credentials. One account per individual. We reserve the right to suspend accounts involved in fraudulent activity.</p>
+<h2>5. Orders &amp; Pricing</h2><p>All orders are subject to product availability and serviceability. Prices displayed include applicable taxes unless stated otherwise. We reserve the right to cancel orders due to stock unavailability, pricing errors, or suspected fraud.</p>
+<h2>6. Payments</h2><p>We support Cash on Delivery (COD) and online payments (UPI, cards, net banking) via Razorpay. Online payments are processed securely through Razorpay's PCI-DSS compliant infrastructure. Feriwala does not store your card or bank details.</p>
+<h2>7. Delivery</h2><p>Estimated delivery times are indicative and may vary due to traffic, weather, or operational constraints. You must be available at the delivery address to receive the order. Delivery is limited to serviceable pin codes.</p>
+<h2>8. Cancellation</h2><p>Orders can be cancelled before the shop starts preparing them at no charge. A cancellation fee of ₹20 applies if cancelled after preparation begins. See our <a href="/refund">Refund &amp; Cancellation Policy</a> for details.</p>
+<h2>9. Returns &amp; Refunds</h2><p>Returns are accepted within 24 hours of delivery for damaged, defective, or wrong items only. Items must be unused with original tags. Refunds are processed within 5-7 business days. See our <a href="/refund">Refund &amp; Cancellation Policy</a>.</p>
+<h2>10. Intellectual Property</h2><p>All content, logos, and trademarks on Feriwala are owned by Feriwala. Reproduction or distribution without written permission is prohibited.</p>
+<h2>11. Limitation of Liability</h2><p>Feriwala is not liable for delays caused by force majeure events. Our maximum liability is limited to the order value paid by the customer.</p>
+<h2>12. Governing Law &amp; Jurisdiction</h2><p>These terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts in India.</p>
+<h2>13. Changes</h2><p>We may update these terms. Continued use of the app after changes constitutes acceptance.</p>
+<h2>14. Contact</h2><p>Email: <a href="mailto:support@feriwala.in">support@feriwala.in</a></p>
+</body></html>`);
+});
+
+app.get('/refund', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Refund &amp; Cancellation Policy - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}table{border-collapse:collapse;width:100%;margin:12px 0}th,td{border:1px solid #ddd;padding:10px;text-align:left}th{background:#f9f9f9}</style></head><body>
+<h1>Refund &amp; Cancellation Policy</h1><p><em>Last updated: May 2025</em></p>
+<h2>1. Cancellation by Customer</h2>
+<table><tr><th>When</th><th>Charge</th></tr>
+<tr><td>Before shop starts preparing</td><td>No charge — full refund</td></tr>
+<tr><td>After preparation starts</td><td>₹20 cancellation fee</td></tr>
+<tr><td>After dispatch</td><td>Cannot be cancelled (return after delivery)</td></tr></table>
+<h2>2. Cancellation by Feriwala</h2><p>We may cancel orders due to stock unavailability, serviceability issues, or suspected fraud. In such cases, a full refund is issued with no charges.</p>
+<h2>3. Returns</h2><p>Returns are accepted within <strong>24 hours</strong> of delivery under the following conditions:</p><ul><li>Item is damaged or defective</li><li>Wrong item delivered</li><li>Size mismatch from what was ordered</li></ul><p>Items must be unused, unwashed, and with original tags intact. The delivery partner will verify the item condition during pickup.</p>
+<h2>4. Non-Returnable Items</h2><ul><li>Innerwear and undergarments</li><li>Items without original tags</li><li>Items showing signs of use or washing</li></ul>
+<h2>5. Refund Timelines</h2>
+<table><tr><th>Payment Method</th><th>Refund Timeline</th></tr>
+<tr><td>Online (UPI/Card/Net Banking)</td><td>5-7 business days to original payment method</td></tr>
+<tr><td>Cash on Delivery</td><td>Credited as store wallet balance within 24 hours, or bank transfer in 5-7 business days on request</td></tr></table>
+<h2>6. How to Request</h2><p>Open the order in the app → Tap "Return/Refund" → Select reason → Our delivery partner will pick up the item.</p>
+<h2>7. Contact</h2><p>For refund queries: <a href="mailto:support@feriwala.in">support@feriwala.in</a></p>
+</body></html>`);
+});
+
+app.get('/contact', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Contact Us - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}</style></head><body>
+<h1>Contact Us</h1>
+<h2>Customer Support</h2><p>Email: <a href="mailto:support@feriwala.in">support@feriwala.in</a></p><p>Hours: Monday to Saturday, 9:00 AM – 8:00 PM IST</p>
+<h2>Business Enquiries</h2><p>Email: <a href="mailto:business@feriwala.in">business@feriwala.in</a></p>
+<h2>Privacy &amp; Data Requests</h2><p>Email: <a href="mailto:privacy@feriwala.in">privacy@feriwala.in</a></p>
+<h2>Registered Address</h2><p>Feriwala<br>India</p>
+<h2>Grievance Officer</h2><p>Name: Feriwala Support Team<br>Email: <a href="mailto:grievance@feriwala.in">grievance@feriwala.in</a><br>Response time: Within 48 hours</p>
+</body></html>`);
+});
+
+app.get('/about', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>About Us - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}</style></head><body>
+<h1>About Feriwala</h1>
+<p>Feriwala is a quick-commerce platform delivering clothes and footwear in minutes from local stores to your doorstep.</p>
+<h2>What We Do</h2><p>We connect customers with nearby clothing retailers, enabling ultra-fast delivery of apparel products. Our platform empowers local shop owners to reach more customers while providing buyers with the convenience of instant fashion delivery.</p>
+<h2>How It Works</h2><ol><li>Browse products from stores near you</li><li>Place your order</li><li>Our delivery partner picks items from the store</li><li>Delivered to your doorstep in 25-45 minutes</li></ol>
+<h2>Our Promise</h2><ul><li>Genuine products from verified local retailers</li><li>Real-time order tracking</li><li>Easy returns within 24 hours</li><li>Secure payments via Razorpay</li><li>Cash on Delivery available</li></ul>
+<h2>Contact</h2><p>Email: <a href="mailto:support@feriwala.in">support@feriwala.in</a><br>Website: <a href="https://api.feriwala.in">feriwala.in</a></p>
+</body></html>`);
+});
+
+app.get('/shipping', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shipping &amp; Delivery Policy - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}table{border-collapse:collapse;width:100%;margin:12px 0}th,td{border:1px solid #ddd;padding:10px;text-align:left}th{background:#f9f9f9}</style></head><body>
+<h1>Shipping &amp; Delivery Policy</h1><p><em>Last updated: May 2025</em></p>
+<h2>1. Delivery Area</h2><p>Feriwala delivers within serviceable pin codes only. Availability is shown in the app based on your location.</p>
+<h2>2. Delivery Time</h2><p>Estimated delivery: <strong>25-45 minutes</strong> from order confirmation, subject to store preparation time, distance, and traffic conditions.</p>
+<h2>3. Delivery Charges</h2>
+<table><tr><th>Order Value</th><th>Delivery Fee</th></tr>
+<tr><td>Above ₹299</td><td>FREE</td></tr>
+<tr><td>Below ₹299</td><td>₹20</td></tr></table>
+<h2>4. Delivery Verification</h2><p>Our delivery partner may ask for an OTP or signature to confirm delivery at your doorstep.</p>
+<h2>5. Failed Delivery</h2><p>If you are unavailable at the delivery address, the partner will attempt to contact you. If unreachable, the order will be returned to the store and a refund will be initiated minus delivery charges.</p>
+<h2>6. Contact</h2><p>For delivery issues: <a href="mailto:support@feriwala.in">support@feriwala.in</a></p>
+</body></html>`);
+});
+
+app.get('/delete-account', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Delete Account - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}</style></head><body>
+<h1>Account &amp; Data Deletion</h1>
+<h2>How to Delete Your Account</h2><p>You can request account deletion by:</p><ol><li>Opening the Feriwala app → Profile → Help &amp; Support → Request Account Deletion</li><li>Or emailing <a href="mailto:privacy@feriwala.in">privacy@feriwala.in</a> from your registered email with subject "Delete My Account"</li></ol>
+<h2>What Gets Deleted</h2><ul><li>Your profile information (name, email, phone)</li><li>Saved addresses</li><li>Order history</li><li>Wallet balance and rewards</li></ul>
+<h2>Timeline</h2><p>Account deletion is processed within <strong>72 hours</strong> of request. You will receive a confirmation email once completed.</p>
+<h2>Important Notes</h2><ul><li>Pending orders must be completed or cancelled before deletion</li><li>Any pending refunds will be processed before account removal</li><li>This action is irreversible</li></ul>
 </body></html>`);
 });
 

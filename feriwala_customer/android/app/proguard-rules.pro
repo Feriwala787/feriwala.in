@@ -1,26 +1,24 @@
 # Flutter
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.** { *; }
+-keep class io.flutter.util.** { *; }
+-keep class io.flutter.view.** { *; }
 -keep class io.flutter.** { *; }
 -keep class io.flutter.plugins.** { *; }
--dontwarn io.flutter.**
 
-# Keep model classes
+# Razorpay (for when integrated)
 -keepclassmembers class * {
-    @com.google.gson.annotations.SerializedName <fields>;
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepattributes JavascriptInterface
+-keepattributes *Annotation*
+-dontwarn com.razorpay.**
+-keep class com.razorpay.** {*;}
+-optimizations !method/inlining/*
+-keepclasseswithmembers class * {
+  public void onPayment*(...);
 }
 
-# OkHttp / HTTP
--dontwarn okhttp3.**
--dontwarn okio.**
-
-# Socket.IO
--keep class io.socket.** { *; }
--dontwarn io.socket.**
-
-# Geolocator
--keep class com.baseflow.geolocator.** { *; }
-
-# Permission handler
--keep class com.baseflow.permissionhandler.** { *; }
-
-# Keep enums
--keepclassmembers enum * { *; }
+# Google Play Services
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**

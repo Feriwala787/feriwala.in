@@ -27,6 +27,8 @@ import 'screens/privacy_policy_screen.dart';
 import 'screens/terms_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/otp_verification_screen.dart';
+import 'screens/refund_policy_screen.dart';
+import 'screens/contact_us_screen.dart';
 
 int? _parseRouteInt(Object? value) {
   if (value is int) return value;
@@ -118,6 +120,8 @@ class FeriwalaCustomerApp extends StatelessWidget {
           '/privacy': (context) => const PrivacyPolicyScreen(),
           '/terms': (context) => const TermsScreen(),
           '/forgot-password': (context) => const ForgotPasswordScreen(),
+          '/refund-policy': (context) => const RefundPolicyScreen(),
+          '/contact': (context) => const ContactUsScreen(),
         },
         onGenerateRoute: (settings) {
           if (settings.name == '/product') {

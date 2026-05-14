@@ -46,7 +46,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
               '• Request a copy of your data\n'
               '• Request deletion of your account and data\n'
               '• Update your personal information in the Profile section\n\n'
-              'To exercise these rights, contact us at privacy@feriwala.in'),
+              'To exercise these rights, contact us at privacy@feriwala.in\n\n'
+              'Account deletion is processed within 72 hours. Visit https://api.feriwala.in/delete-account for details.'),
             _section('7. Children\'s Privacy',
               'Feriwala is not directed at children under 13. '
               'We do not knowingly collect data from children under 13.'),

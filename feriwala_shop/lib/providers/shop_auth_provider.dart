@@ -68,10 +68,12 @@ class ShopAuthProvider extends ChangeNotifier {
                 await _api.clearToken();
               }
             } catch (_) {
-              await _api.clearToken();
+              // Keep authenticated — profile will load on next app open
+              _isAuthenticated = true;
             }
           } else {
-            await _api.clearToken();
+            // Refresh failed but could be network — keep session alive
+            _isAuthenticated = true;
           }
         }
         // For network errors, keep tokens — user stays logged in

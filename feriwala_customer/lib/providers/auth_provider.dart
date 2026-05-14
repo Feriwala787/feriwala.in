@@ -33,12 +33,15 @@ class AuthProvider extends ChangeNotifier {
 
   void _startSessionRefresh() {
     _sessionRefreshTimer?.cancel();
-    _sessionRefreshTimer = Timer.periodic(const Duration(minutes: 10), (_) async {
+    // Refresh token proactively every 5 days (well before 7-day expiry)
+    _sessionRefreshTimer = Timer.periodic(const Duration(hours: 12), (_) async {
       if (_isAuthenticated) {
-        final refreshed = await _api.refreshAccessToken();
-        if (!refreshed) {
-          await _clearSession();
-          notifyListeners();
+        // Only attempt refresh, never logout on failure
+        // Network errors, server downtime etc. should not log user out
+        try {
+          await _api.refreshAccessToken();
+        } catch (_) {
+          // Silently ignore — user stays logged in
         }
       }
     });

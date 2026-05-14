@@ -93,12 +93,20 @@ class ApiService {
 
   Future<Map<String, dynamic>> _requestWithAutoRefresh(
       Future<http.Response> Function() requestFn) async {
-    final response = await requestFn();
+    http.Response response;
+    try {
+      response = await requestFn();
+    } catch (e) {
+      // Network error — rethrow as-is, don't treat as auth failure
+      rethrow;
+    }
     if (response.statusCode != 401) return _handleResponse(response);
 
+    // Token expired — try refresh
     final refreshed = await _tryRefreshToken();
     if (!refreshed) return _handleResponse(response);
 
+    // Retry with new token
     final retryResponse = await requestFn();
     return _handleResponse(retryResponse);
   }
