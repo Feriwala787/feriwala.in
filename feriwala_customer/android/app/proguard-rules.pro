@@ -6,6 +6,10 @@
 -keep class io.flutter.** { *; }
 -keep class io.flutter.plugins.** { *; }
 
+# Play Core (required for R8 with Flutter)
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
+
 # Razorpay (for when integrated)
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
