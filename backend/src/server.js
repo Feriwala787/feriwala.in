@@ -182,87 +182,170 @@ app.get('/', (req, res) => {
 <meta property="og:description" content="Quick commerce for fashion. Get clothes from nearby stores delivered in minutes.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://feriwala.in">
+<link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>\uD83D\uDC55</text></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#333;background:#fff}
-.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;background:linear-gradient(135deg,#FFF5EE 0%,#FFF 50%,#FFF5EE 100%)}
-.logo{width:120px;height:120px;border-radius:24px;margin-bottom:24px;box-shadow:0 8px 32px rgba(244,119,33,0.2)}
-.brand{font-size:48px;font-weight:800;color:#F47721;margin-bottom:8px}
-.tagline{font-size:20px;color:#666;margin-bottom:40px}
-.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;max-width:800px;margin-bottom:48px;text-align:left}
-.feature{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
-.feature-icon{font-size:28px;margin-bottom:8px}
-.feature h3{font-size:15px;margin-bottom:4px;color:#222}
-.feature p{font-size:13px;color:#666;line-height:1.5}
-.download-section{margin-bottom:32px}
-.download-btn{display:inline-flex;align-items:center;gap:10px;background:#F47721;color:#fff;padding:16px 32px;border-radius:12px;text-decoration:none;font-size:16px;font-weight:600;box-shadow:0 4px 16px rgba(244,119,33,0.3);transition:transform 0.2s}
-.download-btn:hover{transform:translateY(-2px)}
-.download-btn svg{width:24px;height:24px;fill:#fff}
-.coming-soon{font-size:13px;color:#999;margin-top:12px}
-.stats{display:flex;gap:40px;margin-bottom:48px;flex-wrap:wrap;justify-content:center}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#333;background:#fff;overflow-x:hidden}
+a{color:#F47721;text-decoration:none}
+
+/* Nav */
+.nav{position:fixed;top:0;width:100%;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border-bottom:1px solid #f0f0f0;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;z-index:100}
+.nav-brand{font-size:22px;font-weight:800;color:#F47721}
+.nav-links{display:flex;gap:16px;align-items:center}
+.nav-links a{font-size:13px;color:#555;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:#F47721}
+.nav-btn{background:#F47721;color:#fff!important;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600}
+.nav-btn:hover{background:#e0650f}
+
+/* Hero */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:100px 20px 60px;background:linear-gradient(180deg,#FFF5EE 0%,#fff 40%,#fff 100%)}
+.brand{font-size:56px;font-weight:900;color:#F47721;margin-bottom:12px;letter-spacing:-1px}
+.tagline{font-size:22px;color:#555;margin-bottom:12px;font-weight:400}
+.sub-tagline{font-size:15px;color:#888;margin-bottom:48px;max-width:500px}
+
+/* Stats */
+.stats{display:flex;gap:48px;margin-bottom:56px;flex-wrap:wrap;justify-content:center}
 .stat{text-align:center}
-.stat-value{font-size:28px;font-weight:700;color:#F47721}
-.stat-label{font-size:12px;color:#888;margin-top:4px}
-.how-it-works{max-width:600px;margin-bottom:48px}
-.how-it-works h2{font-size:22px;margin-bottom:20px;color:#222}
-.steps{display:flex;flex-direction:column;gap:16px;text-align:left}
-.step{display:flex;align-items:center;gap:16px}
-.step-num{width:36px;height:36px;border-radius:50%;background:#F47721;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
-.step-text{font-size:14px;color:#444}
-footer{padding:24px;text-align:center;border-top:1px solid #f0f0f0;font-size:12px;color:#999}
-footer a{color:#F47721;text-decoration:none;margin:0 8px}
-@media(max-width:600px){.brand{font-size:36px}.tagline{font-size:16px}.stats{gap:24px}}
+.stat-value{font-size:32px;font-weight:800;color:#F47721}
+.stat-label{font-size:12px;color:#888;margin-top:4px;text-transform:uppercase;letter-spacing:0.5px}
+
+/* Features */
+.features-section{padding:80px 20px;background:#FAFAFA}
+.section-title{text-align:center;font-size:28px;font-weight:700;margin-bottom:12px;color:#222}
+.section-sub{text-align:center;font-size:14px;color:#888;margin-bottom:48px}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px;max-width:960px;margin:0 auto}
+.feature{background:#fff;border:1px solid #f0f0f0;border-radius:16px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,0.03);transition:transform 0.2s,box-shadow 0.2s}
+.feature:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(244,119,33,0.1)}
+.feature-icon{font-size:36px;margin-bottom:12px}
+.feature h3{font-size:16px;margin-bottom:6px;color:#222}
+.feature p{font-size:13px;color:#666;line-height:1.6}
+
+/* How it works */
+.how-section{padding:80px 20px;max-width:700px;margin:0 auto}
+.steps{display:flex;flex-direction:column;gap:20px}
+.step{display:flex;align-items:center;gap:20px;background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.03)}
+.step-num{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#F47721,#FF9A56);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex-shrink:0}
+.step-text{font-size:15px;color:#444}
+
+/* Download */
+.download-section{padding:80px 20px;text-align:center;background:linear-gradient(135deg,#FFF5EE,#FFF)}
+.download-btn{display:inline-flex;align-items:center;gap:12px;background:#F47721;color:#fff;padding:18px 36px;border-radius:14px;text-decoration:none;font-size:17px;font-weight:700;box-shadow:0 6px 24px rgba(244,119,33,0.35);transition:transform 0.2s,box-shadow 0.2s}
+.download-btn:hover{transform:translateY(-3px);box-shadow:0 10px 32px rgba(244,119,33,0.4)}
+.download-btn svg{width:26px;height:26px;fill:#fff}
+.coming-soon{font-size:13px;color:#999;margin-top:14px}
+
+/* Footer */
+footer{background:#1a1a1a;color:#ccc;padding:48px 24px 32px}
+.footer-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:32px;max-width:960px;margin:0 auto 32px}
+.footer-col h4{color:#fff;font-size:14px;margin-bottom:12px;font-weight:600}
+.footer-col p,.footer-col a{font-size:13px;color:#aaa;line-height:2;display:block}
+.footer-col a:hover{color:#F47721}
+.footer-bottom{border-top:1px solid #333;padding-top:20px;text-align:center;font-size:12px;color:#666;max-width:960px;margin:0 auto}
+.footer-bottom a{color:#888;margin:0 6px}
+
+@media(max-width:600px){.brand{font-size:38px}.tagline{font-size:18px}.stats{gap:24px}.nav-links a:not(.nav-btn){display:none}}
 </style></head><body>
-<div class="hero">
-  <img src="/api/health/../../../uploads/logo.png" onerror="this.style.display='none'" alt="Feriwala" class="logo">
+
+<nav class="nav">
+  <div class="nav-brand">Feriwala</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How It Works</a>
+    <a href="#download">Download</a>
+    <a href="/admin" class="nav-btn">Admin Portal</a>
+  </div>
+</nav>
+
+<section class="hero">
   <h1 class="brand">Feriwala</h1>
   <p class="tagline">Clothes delivered in minutes \u26A1</p>
+  <p class="sub-tagline">Quick commerce for fashion. Shop from local stores near you and get clothes & footwear delivered to your doorstep.</p>
 
   <div class="stats">
-    <div class="stat"><div class="stat-value">25-45</div><div class="stat-label">Minutes Delivery</div></div>
-    <div class="stat"><div class="stat-value">\u20B90</div><div class="stat-label">Free Delivery 299+</div></div>
+    <div class="stat"><div class="stat-value">25-45</div><div class="stat-label">Min Delivery</div></div>
+    <div class="stat"><div class="stat-value">\u20B90</div><div class="stat-label">Delivery 299+</div></div>
     <div class="stat"><div class="stat-value">24hr</div><div class="stat-label">Easy Returns</div></div>
+    <div class="stat"><div class="stat-value">COD</div><div class="stat-label">& Online Pay</div></div>
   </div>
+</section>
 
+<section class="features-section" id="features">
+  <h2 class="section-title">Why Feriwala?</h2>
+  <p class="section-sub">Everything you need for quick fashion shopping</p>
   <div class="features">
-    <div class="feature"><div class="feature-icon">\uD83D\uDC55</div><h3>Local Fashion, Fast</h3><p>Shop from verified clothing stores near you. Men, Women, Kids — all categories.</p></div>
-    <div class="feature"><div class="feature-icon">\uD83D\uDEF5</div><h3>Lightning Delivery</h3><p>Our delivery partners pick from the store and bring it to your doorstep in minutes.</p></div>
-    <div class="feature"><div class="feature-icon">\uD83D\uDCB0</div><h3>COD & Online Pay</h3><p>Pay with cash on delivery or use UPI, cards, net banking — your choice.</p></div>
-    <div class="feature"><div class="feature-icon">\uD83D\uDD04</div><h3>Hassle-free Returns</h3><p>Not satisfied? Return within 24 hours. Our partner picks it up from you.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83D\uDC55</div><h3>Local Fashion, Fast</h3><p>Shop from verified clothing stores near you. Men, Women, Kids, Ethnic, Western, Footwear \u2014 all categories available.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83D\uDEF5</div><h3>Lightning Delivery</h3><p>Our delivery partners pick from the store and bring it to your doorstep in 25-45 minutes. Track live on map.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83D\uDCB0</div><h3>Flexible Payments</h3><p>Pay with Cash on Delivery or use UPI, cards, net banking. All online payments secured by Razorpay.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83D\uDD04</div><h3>Hassle-free Returns</h3><p>Not satisfied? Return within 24 hours. Our delivery partner picks it up from your doorstep. No questions asked.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83D\uDCCD</div><h3>Real-time Tracking</h3><p>Track your order live on the map. Know exactly when your delivery partner is arriving.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83C\uDF1F</div><h3>Deals & Offers</h3><p>Exclusive deals from local stores. Save more with promotional offers and free delivery on orders above \u20B9299.</p></div>
   </div>
+</section>
 
-  <div class="how-it-works">
-    <h2>How It Works</h2>
-    <div class="steps">
-      <div class="step"><div class="step-num">1</div><div class="step-text">Browse clothes from nearby stores on the app</div></div>
-      <div class="step"><div class="step-num">2</div><div class="step-text">Add to cart and place your order</div></div>
-      <div class="step"><div class="step-num">3</div><div class="step-text">Our delivery partner picks items from the store</div></div>
-      <div class="step"><div class="step-num">4</div><div class="step-text">Delivered to your doorstep in 25-45 minutes!</div></div>
-    </div>
+<section class="how-section" id="how-it-works">
+  <h2 class="section-title">How It Works</h2>
+  <p class="section-sub">4 simple steps to get clothes delivered</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-text">Open the app and browse products from nearby stores</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Add items to cart and place your order</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">Our delivery partner picks items from the store</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Delivered to your doorstep in 25-45 minutes!</div></div>
   </div>
+</section>
 
-  <div class="download-section">
-    <a href="#" id="playstore-link" class="download-btn">
-      <svg viewBox="0 0 24 24"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.61 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
-      Get it on Google Play
-    </a>
-    <p class="coming-soon">\uD83D\uDEA7 Coming soon on Play Store. Stay tuned!</p>
-  </div>
-</div>
+<section class="download-section" id="download">
+  <h2 class="section-title">Download the App</h2>
+  <p class="section-sub">Available for Android</p>
+  <a href="#" id="playstore-link" class="download-btn">
+    <svg viewBox="0 0 24 24"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.61 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+    Get it on Google Play
+  </a>
+  <p class="coming-soon">\uD83D\uDEA7 Coming soon on Play Store. Stay tuned!</p>
+</section>
 
 <footer>
-  <p>\u00A9 2025 Feriwala. All rights reserved.</p>
-  <p style="margin-top:8px">
-    <a href="/privacy">Privacy Policy</a>
-    <a href="/terms">Terms & Conditions</a>
-    <a href="/refund">Refund Policy</a>
-    <a href="/shipping">Shipping</a>
-    <a href="/contact">Contact Us</a>
-    <a href="/about">About</a>
-  </p>
-  <p style="margin-top:8px">support@feriwala.in</p>
+  <div class="footer-grid">
+    <div class="footer-col">
+      <h4>Feriwala</h4>
+      <p>Quick commerce for clothes & footwear. Delivering fashion from local stores in minutes.</p>
+      <p style="margin-top:8px">\u00A9 2025 Feriwala. All rights reserved.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Quick Links</h4>
+      <a href="/about">About Us</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms & Conditions</a>
+      <a href="/refund">Refund & Cancellation</a>
+      <a href="/shipping">Shipping & Delivery</a>
+    </div>
+    <div class="footer-col">
+      <h4>For Business</h4>
+      <a href="/admin">Admin Portal Login</a>
+      <a href="mailto:business@feriwala.in">Partner With Us</a>
+      <a href="/contact">Contact Us</a>
+    </div>
+    <div class="footer-col">
+      <h4>Get In Touch</h4>
+      <p>\uD83D\uDCE7 <a href="mailto:care@feriwala.in">care@feriwala.in</a></p>
+      <p>\uD83D\uDCDE <a href="tel:+919399584823">+91 93995 84823</a></p>
+      <p>\uD83D\uDCCD India</p>
+      <p style="margin-top:8px;font-size:11px;color:#666">Mon-Sat, 9:00 AM \u2013 8:00 PM IST</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <a href="/privacy">Privacy</a>\u2022
+    <a href="/terms">Terms</a>\u2022
+    <a href="/refund">Refunds</a>\u2022
+    <a href="/contact">Contact</a>\u2022
+    <a href="/admin">Admin</a>
+  </div>
 </footer>
 </body></html>`);
+});
+
+// ─── Admin portal redirect ────────────────────────────────────────────────────
+app.get('/admin', (req, res) => {
+  res.redirect('http://65.2.9.216');
 });
 
 // ─── Legal pages (required for Play Store / App Store) ────────────────────────
