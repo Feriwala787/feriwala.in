@@ -1,0 +1,74 @@
+name: Deploy Customer Web App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'feriwala_customer/**'
+      - '.github/workflows/deploy-customer-web.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-web:
+    name: Build & Deploy Customer Web
+    runs-on: ubuntu-latest
+    env:
+      SSH_USER: bitnami
+      SSH_HOST: 65.2.9.216
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        working-directory: feriwala_customer
+        run: flutter pub get
+
+      - name: Build web
+        working-directory: feriwala_customer
+        run: flutter build web --release --base-href /
+
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feriwala-customer-web
+          path: feriwala_customer/build/web
+          retention-days: 7
+
+      - name: Resolve server SSH access
+        env:
+          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "$LIGHTSAIL_SSH_KEY" ]; then
+            printf '%s' "$LIGHTSAIL_SSH_KEY" > lightsail.pem
+            chmod 600 lightsail.pem
+            echo "SSH_OPTS=-i lightsail.pem -o StrictHostKeyChecking=no" >> "$GITHUB_ENV"
+          else
+            echo "::error::LIGHTSAIL_SSH_KEY secret is not set."
+            exit 1
+          fi
+
+      - name: Ensure remote directory exists
+        run: |
+          ssh $SSH_OPTS "$SSH_USER@$SSH_HOST" \
+            "mkdir -p /home/bitnami/feriwala/customer-web"
+
+      - name: Sync web build to server
+        run: |
+          rsync -avz --delete \
+            -e "ssh $SSH_OPTS" \
+            feriwala_customer/build/web/ "$SSH_USER@$SSH_HOST:/home/bitnami/feriwala/customer-web/"
+
+      - name: Reload nginx
+        run: |
+          ssh $SSH_OPTS "$SSH_USER@$SSH_HOST" \
+            "sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: Cleanup key
+        if: always()
+        run: rm -f lightsail.pem

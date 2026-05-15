@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../config/app_config.dart';
 
@@ -11,7 +12,7 @@ class SocketService {
   void connect() {
     if (_socket != null) return;
 
-    _socket = IO.io(AppConfig.socketUrl, <String, dynamic>{
+    _socket = IO.io(kIsWeb ? AppConfig.webSocketUrl : AppConfig.socketUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': true,
     });

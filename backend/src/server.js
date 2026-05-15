@@ -345,7 +345,7 @@ footer{background:#1a1a1a;color:#ccc;padding:48px 24px 32px}
 
 // ─── Admin portal redirect ────────────────────────────────────────────────────
 app.get('/admin', (req, res) => {
-  res.redirect('http://65.2.9.216');
+  res.redirect('https://feriwala.in/portal');
 });
 
 // ─── Legal pages (required for Play Store / App Store) ────────────────────────

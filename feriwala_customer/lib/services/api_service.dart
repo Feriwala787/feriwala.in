@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
@@ -9,6 +10,8 @@ class ApiService {
   ApiService._internal();
 
   String? _token;
+
+  String get _baseUrl => kIsWeb ? AppConfig.webApiBaseUrl : AppConfig.apiBaseUrl;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -36,7 +39,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> get(String endpoint,
       {Map<String, String>? queryParams}) async {
-    final uri = Uri.parse('${AppConfig.apiBaseUrl}$endpoint')
+    final uri = Uri.parse('${_baseUrl}$endpoint')
         .replace(queryParameters: queryParams);
     return _requestWithAutoRefresh(
         () => http.get(uri, headers: _headers()).timeout(const Duration(seconds: 15)));
@@ -45,7 +48,7 @@ class ApiService {
   Future<Map<String, dynamic>> post(String endpoint,
       {Map<String, dynamic>? body, Map<String, String>? headers}) async {
     return _requestWithAutoRefresh(() => http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}$endpoint'),
+      Uri.parse('${_baseUrl}$endpoint'),
       headers: _headers(extra: headers),
       body: jsonEncode(body),
     ).timeout(const Duration(seconds: 20)));
@@ -54,7 +57,7 @@ class ApiService {
   Future<Map<String, dynamic>> put(String endpoint,
       {Map<String, dynamic>? body}) async {
     return _requestWithAutoRefresh(() => http.put(
-      Uri.parse('${AppConfig.apiBaseUrl}$endpoint'),
+      Uri.parse('${_baseUrl}$endpoint'),
       headers: _headers(),
       body: jsonEncode(body),
     ).timeout(const Duration(seconds: 15)));
@@ -70,7 +73,7 @@ class ApiService {
       if (refreshToken == null) return false;
 
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/refresh'),
+        Uri.parse('${_baseUrl}/auth/refresh'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refreshToken': refreshToken}),
       );

@@ -8,6 +8,8 @@ class AppConfig {
     'SOCKET_URL',
     defaultValue: 'https://api.feriwala.in',
   );
+  static const String webApiBaseUrl = 'https://feriwala.in/api';
+  static const String webSocketUrl = 'https://feriwala.in';
   static const String awsRegion = 'ap-south-1';
   static const String awsAccessKeyId = String.fromEnvironment('AWS_ACCESS_KEY_ID', defaultValue: '');
   static const String awsSecretAccessKey = String.fromEnvironment('AWS_SECRET_ACCESS_KEY', defaultValue: '');
