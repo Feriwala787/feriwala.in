@@ -174,6 +174,97 @@ app.post('/api/seed-admin', async (req, res) => {
   }
 });
 
+// ─── Landing page ─────────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Feriwala - Clothes Delivered in Minutes</title>
+<meta name="description" content="Feriwala delivers clothes and footwear from local stores to your doorstep in 25-45 minutes. Download the app now!">
+<meta property="og:title" content="Feriwala - Clothes Delivered in Minutes">
+<meta property="og:description" content="Quick commerce for fashion. Get clothes from nearby stores delivered in minutes.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://feriwala.in">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#333;background:#fff}
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 20px;background:linear-gradient(135deg,#FFF5EE 0%,#FFF 50%,#FFF5EE 100%)}
+.logo{width:120px;height:120px;border-radius:24px;margin-bottom:24px;box-shadow:0 8px 32px rgba(244,119,33,0.2)}
+.brand{font-size:48px;font-weight:800;color:#F47721;margin-bottom:8px}
+.tagline{font-size:20px;color:#666;margin-bottom:40px}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;max-width:800px;margin-bottom:48px;text-align:left}
+.feature{background:#fff;border:1px solid #f0f0f0;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.feature-icon{font-size:28px;margin-bottom:8px}
+.feature h3{font-size:15px;margin-bottom:4px;color:#222}
+.feature p{font-size:13px;color:#666;line-height:1.5}
+.download-section{margin-bottom:32px}
+.download-btn{display:inline-flex;align-items:center;gap:10px;background:#F47721;color:#fff;padding:16px 32px;border-radius:12px;text-decoration:none;font-size:16px;font-weight:600;box-shadow:0 4px 16px rgba(244,119,33,0.3);transition:transform 0.2s}
+.download-btn:hover{transform:translateY(-2px)}
+.download-btn svg{width:24px;height:24px;fill:#fff}
+.coming-soon{font-size:13px;color:#999;margin-top:12px}
+.stats{display:flex;gap:40px;margin-bottom:48px;flex-wrap:wrap;justify-content:center}
+.stat{text-align:center}
+.stat-value{font-size:28px;font-weight:700;color:#F47721}
+.stat-label{font-size:12px;color:#888;margin-top:4px}
+.how-it-works{max-width:600px;margin-bottom:48px}
+.how-it-works h2{font-size:22px;margin-bottom:20px;color:#222}
+.steps{display:flex;flex-direction:column;gap:16px;text-align:left}
+.step{display:flex;align-items:center;gap:16px}
+.step-num{width:36px;height:36px;border-radius:50%;background:#F47721;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.step-text{font-size:14px;color:#444}
+footer{padding:24px;text-align:center;border-top:1px solid #f0f0f0;font-size:12px;color:#999}
+footer a{color:#F47721;text-decoration:none;margin:0 8px}
+@media(max-width:600px){.brand{font-size:36px}.tagline{font-size:16px}.stats{gap:24px}}
+</style></head><body>
+<div class="hero">
+  <img src="/api/health/../../../uploads/logo.png" onerror="this.style.display='none'" alt="Feriwala" class="logo">
+  <h1 class="brand">Feriwala</h1>
+  <p class="tagline">Clothes delivered in minutes \u26A1</p>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-value">25-45</div><div class="stat-label">Minutes Delivery</div></div>
+    <div class="stat"><div class="stat-value">\u20B90</div><div class="stat-label">Free Delivery 299+</div></div>
+    <div class="stat"><div class="stat-value">24hr</div><div class="stat-label">Easy Returns</div></div>
+  </div>
+
+  <div class="features">
+    <div class="feature"><div class="feature-icon">\uD83D\uDC55</div><h3>Local Fashion, Fast</h3><p>Shop from verified clothing stores near you. Men, Women, Kids — all categories.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83D\uDEF5</div><h3>Lightning Delivery</h3><p>Our delivery partners pick from the store and bring it to your doorstep in minutes.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83D\uDCB0</div><h3>COD & Online Pay</h3><p>Pay with cash on delivery or use UPI, cards, net banking — your choice.</p></div>
+    <div class="feature"><div class="feature-icon">\uD83D\uDD04</div><h3>Hassle-free Returns</h3><p>Not satisfied? Return within 24 hours. Our partner picks it up from you.</p></div>
+  </div>
+
+  <div class="how-it-works">
+    <h2>How It Works</h2>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-text">Browse clothes from nearby stores on the app</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Add to cart and place your order</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Our delivery partner picks items from the store</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Delivered to your doorstep in 25-45 minutes!</div></div>
+    </div>
+  </div>
+
+  <div class="download-section">
+    <a href="#" id="playstore-link" class="download-btn">
+      <svg viewBox="0 0 24 24"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.61 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+      Get it on Google Play
+    </a>
+    <p class="coming-soon">\uD83D\uDEA7 Coming soon on Play Store. Stay tuned!</p>
+  </div>
+</div>
+
+<footer>
+  <p>\u00A9 2025 Feriwala. All rights reserved.</p>
+  <p style="margin-top:8px">
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms & Conditions</a>
+    <a href="/refund">Refund Policy</a>
+    <a href="/shipping">Shipping</a>
+    <a href="/contact">Contact Us</a>
+    <a href="/about">About</a>
+  </p>
+  <p style="margin-top:8px">support@feriwala.in</p>
+</footer>
+</body></html>`);
+});
+
 // ─── Legal pages (required for Play Store / App Store) ────────────────────────
 app.get('/privacy', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Privacy Policy - Feriwala</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.7;color:#333}h1{color:#F47721}h2{margin-top:28px}a{color:#F47721}</style></head><body>
